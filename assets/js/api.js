@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbyc7Bhtvo2dt3588lagysfD_cKezwrgVzn-JpbI7TkTjbzbrpl_9d0oWMuRri71qds2Hw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxhrJwGOTMQsGhMEurvODftQhK80iMbE9_Ml5_U7P1TnjSekdHFpBc1uNQot5bMrhMPVw/exec";
 
 async function fetchDades() {
     try {
