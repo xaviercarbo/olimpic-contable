@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <?!= include('styles'); ?>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans">
+  <div id="app" class="flex h-screen">
+    <aside class="w-64 bg-indigo-900 text-white p-6 shadow-2xl">
+      <h2 class="text-2xl font-bold mb-8">Olimpic 🥇</h2>
+      <nav id="menu-temes" class="space-y-2"></nav>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto p-10">
+      <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm p-8 border border-slate-200">
+        <div id="game-container">
+          <p id="tema-label" class="text-indigo-600 font-bold text-sm uppercase mb-2"></p>
+          <h1 id="enunciat" class="text-2xl mb-8 font-medium">Carregant dades...</h1>
+          
+          <div class="grid grid-cols-2 gap-6 mb-8">
+            <div id="box-deure" class="p-6 bg-emerald-50 rounded-xl border-2 border-dashed border-emerald-200 min-h-[150px]">
+              <h3 class="text-emerald-700 font-bold mb-4">DEURE</h3>
+              <div id="items-deure" class="space-y-2"></div>
+            </div>
+            <div id="box-haver" class="p-6 bg-blue-50 rounded-xl border-2 border-dashed border-blue-200 min-h-[150px]">
+              <h3 class="text-blue-700 font-bold mb-4">HAVER</h3>
+              <div id="items-haver" class="space-y-2"></div>
+            </div>
+          </div>
+
+          <div class="relative">
+            <input type="text" id="cercador" placeholder="Cerca compte (ex: 570)..." 
+                   class="w-full p-4 bg-slate-100 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+            <div id="results" class="absolute w-full bg-white shadow-xl rounded-b-lg hidden z-50 max-h-48 overflow-y-auto"></div>
+          </div>
+          
+          <button onclick="checkAnswer()" class="mt-6 w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition">
+            VALIDAR ASSENTAMENT
+          </button>
+        </div>
+      </div>
+
+      <div id="majors-container" class="mt-10 grid grid-cols-4 gap-4"></div>
+    </main>
+  </div>
+
+  <?!= include('scripts'); ?>
+</body>
+</html>
