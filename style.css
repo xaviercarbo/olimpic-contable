@@ -1,0 +1,117 @@
+/* Efecte de taula interactiva */
+input[type="number"]::-webkit-inner-spin-button {
+  display: none;
+}
+
+/* Animació de Majors */
+.t-account {
+  background: white;
+  border: 1px solid #cbd5e1;
+  transition: transform 0.2s;
+}
+.t-account:hover {
+  transform: translateY(-2px);
+}
+
+/* Disseny d'estat de validació */
+#feedback-success.active {
+  transform: translateY(0);
+}
+
+.t-col {
+  padding: 4px;
+  font-size: 12px;
+  min-height: 40px;
+}
+
+/* Animació de medalla */
+.medal-pop {
+  animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Avatar Ghibli amb marc circular i ombra suau */
+#user-icon img {
+  filter: saturate(1.1) contrast(1.05);
+  border: 2px solid #6366f1;
+}
+
+/* Taula interactiva neta */
+input[type="number"]::-webkit-inner-spin-button {
+  display: none;
+}
+input:focus {
+  background-color: #f8fafc;
+}
+
+/* Botó de Refresh (Punt 4) */
+.btn-refresh {
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+.btn-refresh:active {
+  transform: rotate(180deg);
+}
+
+/* Sidebar scroll */
+.custom-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
+
+/* Estil per als Majors (substituint els @apply per CSS normal) */
+.t-major {
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.t-header {
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.5rem;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+/* Animació de la medalla */
+@keyframes pop {
+  0% {
+    transform: scale(0) rotate(-45deg);
+    opacity: 0;
+  }
+  80% {
+    transform: scale(1.4) rotate(10deg);
+  }
+  100% {
+    transform: scale(1.2) rotate(0);
+    opacity: 1;
+  }
+}
+
+.medalla-pop {
+  animation: pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Afegeix això al teu style.css o al bloc <style> de l'index.html */
+@keyframes medal-pop {
+  0% {
+    transform: scale(0) translateY(50px);
+    opacity: 0;
+  }
+  80% {
+    transform: scale(1.2) translateY(-10px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-medal {
+  animation: medal-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
