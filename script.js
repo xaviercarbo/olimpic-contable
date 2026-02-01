@@ -68,7 +68,13 @@ async function executarAccio() {
     console.error(error);
   } finally {
     btn.disabled = false;
-    canviarTab(modoActual);
+    if (
+      document.getElementById("modal-login").classList.contains("hidden") ===
+      false
+    ) {
+      btn.innerText =
+        modoActual === "login" ? "Entrar a l'Olimpíada" : "Registrar-me";
+    }
   }
 }
 
@@ -111,13 +117,31 @@ let estat = {
 
 // Modifiquem la funció iniciarApp que ja tenies
 async function iniciarApp(user) {
+  // 1. Assignem l'usuari i el seu progrés guardat a l'estat global
   estat.userActiu = user;
+  estat.punts = parseInt(user.punts) || 0;
+  estat.completats = user.completats || [];
+
+  // 2. Amaguem el login i posem el nom
   document.getElementById("modal-login").classList.add("hidden");
   document.getElementById("user-nom").innerText = user.nom;
-  document.getElementById("user-icon").innerHTML =
-    `<img src="${user.avatar}" class="w-full h-full object-cover">`;
 
+  // 3. Fallback per l'avatar (si no n'hi ha, generem un amb inicials)
+  const avatarUrl =
+    user.avatar && user.avatar.trim() !== ""
+      ? user.avatar
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=6366f1&color=fff&bold=true`;
+
+  document.getElementById("user-icon").innerHTML =
+    `<img src="${avatarUrl}" class="w-full h-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=ef4444&color=fff'">`;
+
+  // 4. ESPEREM a que es carreguin totes les preguntes del Google Sheet
   await carregarDadesContables();
+
+  // 5. ARA SÍ: Un cop tenim les preguntes, calculem el rendiment real
+  actualitzarDashboard();
+
+  // 6. Mostrem la secció final
   mostrarSeccio("dashboard");
 }
 
@@ -533,37 +557,61 @@ async function registrarPunts(punts) {
 }
 
 function actualitzarDashboard() {
-  // 1. Actualitzar Punts (Lògica que ja tenies)
-  const elPunts = document.querySelector(
-    "#seccio-dashboard .text-3xl.font-black.text-slate-800",
-  );
-  if (elPunts) {
-    elPunts.innerText = estat.punts || 0;
-  }
+  const elPunts = document.getElementById("dash-punts");
+  const elRang = document.getElementById("dash-rang");
+  const elBarra = document.getElementById("dash-barra");
+  const elPercentText = document.getElementById("dash-percent-text");
 
-  // 2. Càlcul de Progrés Real (Basat en exercicis completats)
+  // Càlcul de punts: 10 per exercici completat
+  const puntsTotals = estat.completats.length * 10;
+  if (elPunts) elPunts.innerText = puntsTotals.toLocaleString();
+
+  // Càlcul del percentatge global
   const totalPreguntes = estat.preguntes.length;
   const fetes = estat.completats.length;
   const percentatge =
     totalPreguntes > 0 ? Math.round((fetes / totalPreguntes) * 100) : 0;
 
-  // Actualitzem la barra visual (si tens l'ID al teu HTML)
-  const barra = document.getElementById("barra-progres-dashboard");
-  if (barra) {
-    barra.style.width = `${percentatge}%`;
-  }
+  // Actualització de la barra
+  if (elBarra) elBarra.style.width = percentatge + "%";
+  if (elPercentText) elPercentText.innerText = percentatge + "%";
 
-  // 3. Actualitzar el Rang (Millorat amb més categories)
-  const elRang = document.querySelector("#seccio-dashboard .text-indigo-600");
+  // Sistema de Rangs Acadèmics amb colors
   if (elRang) {
-    if (percentatge >= 90) elRang.innerText = "Llegendari (A+)";
-    else if (percentatge >= 50) elRang.innerText = "Expert (B)";
-    else if (percentatge > 0) elRang.innerText = "Aprenent (C)";
-    else elRang.innerText = "Novell";
-  }
+    let nota = "-";
+    let colorClass = "text-slate-400"; // Color per defecte
 
-  // 4. Actualització de l'Avatar (Evitar imatges trencades)
-  actualitzarAvatarVisual();
+    if (percentatge >= 95) {
+      nota = "A+";
+      colorClass = "text-indigo-600"; // Blau intens/lila
+    } else if (percentatge >= 80) {
+      nota = "A";
+      colorClass = "text-emerald-500"; // Verd èxit
+    } else if (percentatge >= 65) {
+      nota = "B";
+      colorClass = "text-amber-500"; // Taronja/Or
+    } else if (percentatge >= 50) {
+      nota = "C";
+      colorClass = "text-slate-600"; // Gris fosc
+    } else if (percentatge > 0) {
+      nota = "D";
+      colorClass = "text-rose-400"; // Vermellós
+    } else {
+      nota = "Novell";
+      colorClass = "text-slate-300";
+    }
+
+    // Apliquem la nota i el color
+    elRang.innerText = nota;
+    elRang.className = `text-3xl font-black transition-colors duration-500 ${colorClass}`;
+
+    // Si és la nota màxima, afegim l'animació de bot de la medalla
+    if (nota === "A+") {
+      elRang.classList.add("animate-bounce");
+    } else {
+      elRang.classList.remove("animate-bounce");
+    }
+  }
 }
 
 // Funció de suport per a l'avatar
