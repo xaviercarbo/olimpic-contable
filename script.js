@@ -1,5 +1,5 @@
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbzsNBrtJJGtkP5ATD45WBTAC2chVOw9p9JIdzUvGkVVpBcK9p31vjkHZkSgr4il_ZZ6/exec"; // <--- ENGANXA LA URL AQUÍ
+  "https://script.google.com/macros/s/AKfycbxTzDAVPVbAJoqjMrJT2qRW--xB-ExcHCvM2zqNlC6lDS53N3Lcbt0r6iuEOzKx3Uba/exec"; // <--- ENGANXA LA URL AQUÍ
 
 let modoActual = "login";
 
@@ -45,9 +45,20 @@ async function executarAccio() {
         alert("✨ Usuari creat amb èxit! Ja pots iniciar sessió.");
         canviarTab("login");
       } else {
-        // Login correcte
-        localStorage.setItem("olimpic_user", JSON.stringify(dades.usuari));
-        iniciarApp(dades.usuari);
+        // --- LOGIN CORRECTE ---
+
+        // 1. Guardem les dades de l'usuari (nom, avatar, punts)
+        const usuariLogin = dades.usuari;
+
+        // 2. Carreguem l'historial d'activitats que ve del full "Progres"
+        // Si no en té cap encara, assignem un array buit []
+        estat.completats = usuariLogin.completats || [];
+
+        // 3. Persistència: Guardem al navegador perquè no calgui fer login cada cop que refresquem
+        localStorage.setItem("olimpic_user", JSON.stringify(usuariLogin));
+
+        // 4. Arrancat de l'interfície
+        iniciarApp(usuariLogin);
       }
     } else {
       alert("⚠️ " + dades.message);
@@ -96,15 +107,22 @@ async function iniciarApp(user) {
 
 async function carregarDadesContables() {
   try {
-    const res = await fetch(API_URL); // El doGet del script
+    const res = await fetch(API_URL);
     const dades = await res.json();
+
+    // Estructurem les dades assegurant-nos que l'ID sigui el "DNI" de l'exercici
+    estat.preguntes = dades.preguntes.map((p) => ({
+      ...p,
+      id: String(p.id), // Ens assegurem que l'ID enviat pel code.gs és un text
+      descripcio: p.descripcio || "",
+    }));
+
     estat.pgc = dades.pgc;
-    estat.preguntes = dades.preguntes;
 
     generarMenuTemes();
     generarDatalistPGC();
   } catch (e) {
-    console.error("Error carregant PGC/Preguntes", e);
+    console.error("Error alineant dades del Sheet:", e);
   }
 }
 
@@ -119,51 +137,82 @@ function mostrarSeccio(id) {
 
 function generarMenuTemes() {
   const menu = document.getElementById("menu-temes");
+  if (!menu) return;
+
   const temes = [...new Set(estat.preguntes.map((p) => p.tema))];
 
   menu.innerHTML = temes
     .map((tema) => {
       const preguntesDelTema = estat.preguntes.filter((p) => p.tema === tema);
 
-      // Generem la llista d'activitats per a aquest tema
-      const llistaActivitats = preguntesDelTema
-        .map((p, index) => {
-          const feta = estat.completats.includes(p.id);
-          return `
-        <li class="ml-4 mt-1">
-          <button onclick="seleccionarPreguntaDirecta('${p.id}')" 
-            class="w-full text-left px-3 py-1 rounded-lg text-[11px] font-bold transition ${feta ? "text-emerald-400 bg-emerald-400/10" : "text-slate-500 hover:bg-slate-800"}">
-            ${feta ? "✅" : "⭕"} Exercici ${index + 1}
-          </button>
-        </li>
-      `;
-        })
-        .join("");
-
       return `
       <li class="mb-4">
-        <div class="px-4 py-2 text-xs font-black text-indigo-400 uppercase tracking-widest bg-slate-800/30 rounded-t-xl">
-          📁 ${tema}
-        </div>
-        <ul class="bg-slate-800/10 pb-2 rounded-b-xl">
-          ${llistaActivitats}
-        </ul>
+        <details class="group" open>
+          <summary class="flex items-center justify-between px-4 py-2 rounded-xl cursor-pointer hover:bg-slate-800 transition text-indigo-300 font-black text-[10px] uppercase tracking-widest list-none">
+            <span class="flex items-center gap-2">
+              <span class="group-open:rotate-90 transition-transform italic text-indigo-500">▶</span>
+              ${tema}
+            </span>
+          </summary>
+          
+          <ul class="mt-2 space-y-1">
+            ${preguntesDelTema
+              .map((p, index) => {
+                // CORRECCIÓ CRÍTICA: Forçar String per a una comparació segura
+                const feta = estat.completats
+                  .map(String)
+                  .includes(String(p.id));
+
+                // Codi a substituir dins de preguntesDelTema.map:
+                return `
+               <li class="ml-4 mb-1">
+              <button onclick="seleccionarPreguntaDirecta('${p.id}')" 
+              class="w-full text-left px-3 py-3 rounded-xl transition group
+              ${feta ? "bg-emerald-500/5 border border-emerald-500/20" : "hover:bg-indigo-500/10 border border-transparent"}">
+        
+              <div class="flex items-start gap-3">
+              <span class="mt-0.5">${feta ? "✅" : "⚪"}</span>
+              <div class="flex flex-col">
+              <span class="text-[11px] font-black uppercase tracking-wider ${feta ? "text-emerald-400" : "text-indigo-200 group-hover:text-white"}">
+              Exercici ${p.id}
+              </span>
+               <span class="text-[10px] leading-tight text-slate-400 font-medium mt-1 group-hover:text-slate-300">
+              ${p.descripcio} </span>
+              </div>
+             </div>
+              </button>
+               </li>`;
+              })
+              .join("")}
+          </ul>
+        </details>
       </li>
     `;
     })
     .join("");
 }
 
-// Nova funció per carregar una pregunta específica des del menú
+// AQUESTA FUNCIÓ ÉS LA QUE FA QUE EL MENÚ FUNCIONI EN CLICAR--------------------------------------------------------------
 function seleccionarPreguntaDirecta(id) {
-  const pregunta = estat.preguntes.find((p) => p.id == id);
+  // 1. Busquem la pregunta assegurant que comparem text amb text
+  const pregunta = estat.preguntes.find((p) => String(p.id) === String(id));
+
   if (pregunta) {
+    // 2. Actualitzem l'objecte sencer, no només el tema
     estat.temaActiu = pregunta.tema;
     estat.preguntaActual = pregunta;
+
+    // 3. Forcem que la interfície s'actualitzi
     mostrarSeccio("exercici");
     mostrarPregunta();
+
+    // Opcional: fem scroll a dalt perquè l'usuari vegi el nou enunciat
+    window.scrollTo(0, 0);
+  } else {
+    console.error("Error: No s'ha trobat l'ID " + id + " a la base de dades.");
   }
 }
+
 // Funció generar llista suggerida ------------------------------------------------------------------------------------
 
 function generarDatalistPGC() {
@@ -233,7 +282,6 @@ function mostrarPregunta() {
 }
 
 // Funcionalitat de les respostes  ---
-
 // Afegeix una fila buida a l'objecte d'estat i actualitza la taula
 function afegirFila() {
   estat.assentament.push({ codi: "", nom: "", deure: 0, haver: 0 });
@@ -306,14 +354,13 @@ function renderTaula() {
   renderMajors();
 }
 // Lògica de validació ---------------------------------------------------------------------------------------------------------------
-
 async function validarAssentament() {
   const solucioEsperada = estat.preguntaActual.solucio;
   const assentamentUsuari = estat.assentament.filter(
     (line) => line.codi !== "",
   );
 
-  // 1. Comprovar si el Deure i l'Haver quadren entre ells
+  // 1. Càlcul de totals amb arrodoniment per seguretat
   const totalD = assentamentUsuari.reduce(
     (acc, l) => acc + parseFloat(l.deure || 0),
     0,
@@ -323,44 +370,106 @@ async function validarAssentament() {
     0,
   );
 
-  if (totalD !== totalH || totalD === 0) {
+  // Comparem amb un marge d'error mínim per evitar problemes de decimals
+  if (Math.abs(totalD - totalH) > 0.01 || totalD === 0) {
     alert("⚠️ L'assentament no quadra o està buit.");
     return;
   }
 
-  // 2. Comprovar contra la solució del Google Sheet
+  // 2. Simplificació i normalització de les claus per a la comparació
+  // Forcem 2 decimals (.toFixed(2)) a tot arreu perquè la comparació sigui idèntica
   const simplificar = (arr) =>
     arr
-      .map((l) => `${l.codi}|${parseFloat(l.deure)}|${parseFloat(l.haver)}`)
+      .map(
+        (l) =>
+          `${l.codi}|${parseFloat(l.deure).toFixed(2)}|${parseFloat(l.haver).toFixed(2)}`,
+      )
       .sort();
 
   const userKeys = simplificar(assentamentUsuari);
   const solKeys = simplificar(solucioEsperada);
 
+  console.log("Usuari:", userKeys); // Per depurar a la consola si falla
+  console.log("Solució:", solKeys);
+
   const esCorrecte = JSON.stringify(userKeys) === JSON.stringify(solKeys);
 
   if (esCorrecte) {
-    // Si l'exercici no s'havia completat abans, registrem els punts
-    if (!estat.completats.includes(estat.preguntaActual.id)) {
-      estat.completats.push(estat.preguntaActual.id);
+    const idActual = String(estat.preguntaActual.id);
 
-      // Fem servir await perquè registrarPunts és una funció asíncrona (fetch)
-      await registrarPunts(10);
+    if (!estat.completats.includes(idActual)) {
+      estat.completats.push(idActual);
 
-      // Refresquem el menú lateral per mostrar el check ✅
+      // Enviem les dades al Google Sheet
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          mode: "no-cors", // Evita errors de CORS al bloquejar la resposta
+          body: JSON.stringify({
+            action: "registrarActivitat",
+            nom: estat.userActiu.nom,
+            idActivitat: idActual,
+            tema: estat.preguntaActual.tema,
+            punts: 10,
+          }),
+        });
+
+        // Actualitzem punts locals
+        estat.punts = (parseInt(estat.punts) || 0) + 10;
+        actualitzarDashboard();
+      } catch (e) {
+        console.error("Error en el registre remot:", e);
+      }
+
       generarMenuTemes();
     }
 
-    // Feedback visual: Mostrem la medalla
-    mostrarExit();
+    mostrarExit(); // Mostra la medalla i passa a la següent
 
-    // Gestió de botons: Amaguem "Validar" i mostrem "Següent"
     document.getElementById("btn-validar").classList.add("hidden");
     document.getElementById("btn-seguent").classList.remove("hidden");
   } else {
     alert(
       "❌ Hi ha algun error en els comptes o els imports. Revisa l'enunciat!",
     );
+  }
+}
+
+// FUNCIÓ AUXILIAR PER AL SCROLL AUTOMÀTIC------------------------------------------------
+function ferScrollAlSegüent(idCompletat) {
+  const menu = document.getElementById("menu-temes");
+  if (!menu) return;
+
+  const botons = menu.querySelectorAll("button");
+  let trobatIndex = -1;
+
+  botons.forEach((btn, i) => {
+    // Busquem el botó que hem clicat (per ID)
+    if (btn.getAttribute("onclick").includes(`'${idCompletat}'`)) {
+      trobatIndex = i;
+    }
+  });
+
+  // Si hi ha un exercici següent, fem scroll fins a ell
+  if (trobatIndex !== -1 && botons[trobatIndex + 1]) {
+    const següentBtn = botons[trobatIndex + 1];
+    següentBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    // Feedback visual: un petit parpelleig
+    següentBtn.classList.add(
+      "ring-2",
+      "ring-indigo-400",
+      "ring-offset-2",
+      "ring-offset-slate-900",
+    );
+    setTimeout(() => {
+      següentBtn.classList.remove(
+        "ring-2",
+        "ring-indigo-400",
+        "ring-offset-2",
+        "ring-offset-slate-900",
+      );
+    }, 2000);
   }
 }
 
@@ -371,13 +480,10 @@ function mostrarExit() {
   const medalla = document.getElementById("medalla-container");
   medalla.classList.remove("hidden");
 
-  // Enviem 10 punts al servidor
-  registrarPunts(10);
-
   setTimeout(() => {
     medalla.classList.add("hidden");
-    // Opcional: carregar següent pregunta del tema
-    següentPregunta();
+    // CORRECCIÓ DEL NOM:
+    carregarSegüentPregunta();
   }, 3000);
 }
 
@@ -477,20 +583,26 @@ function renderMajors() {
 }
 
 function carregarSegüentPregunta() {
-  document.getElementById("medalla-container").classList.add("hidden");
+  // 1. ELIMINAR OBSTACLES: Si la medalla d'èxit està a la pantalla, la tanquem
+  // per començar el nou exercici amb la pantalla neta.
+  const medalla = document.getElementById("medalla-container");
+  if (medalla) medalla.classList.add("hidden");
 
-  const preguntesTema = estat.preguntes.filter(
-    (p) => p.tema === estat.temaActiu,
-  );
-  const indexActual = preguntesTema.findIndex(
-    (p) => p.id === estat.preguntaActual.id,
+  // 2. BUSCAR ON SOM: Busquem la posició de l'exercici actual a la llista total (1 al 13)
+  const indexTotal = estat.preguntes.findIndex(
+    (p) => String(p.id) === String(estat.preguntaActual.id),
   );
 
-  if (indexActual < preguntesTema.length - 1) {
-    estat.preguntaActual = preguntesTema[indexActual + 1];
-    mostrarPregunta();
+  // 3. DECIDIR EL SEGÜENT PAS:
+  if (indexTotal !== -1 && indexTotal < estat.preguntes.length - 1) {
+    // Si NO és l'últim exercici, agafem el següent de la llista
+    const següent = estat.preguntes[indexTotal + 1];
+
+    // Fem servir la funció de càrrega que ja tens, que actualitza l'enunciat i buida la taula
+    seleccionarPreguntaDirecta(següent.id);
   } else {
-    alert("🎉 Has completat tots els exercicis d'aquest tema!");
+    // Si era l'últim (el 13), avisem i tornem al Dashboard
+    alert("🎉 Felicitats! Has completat tots els exercicis de l'Olimpíada.");
     mostrarSeccio("dashboard");
   }
 }
