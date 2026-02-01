@@ -194,42 +194,50 @@ function generarMenuTemes() {
       const preguntesDelTema = estat.preguntes.filter((p) => p.tema === tema);
 
       return `
-      <li class="mb-4">
+      <li class="mb-2">
         <details class="group" open>
-          <summary class="flex items-center justify-between px-4 py-2 rounded-xl cursor-pointer hover:bg-slate-800 transition text-indigo-300 font-black text-[10px] uppercase tracking-widest list-none">
+          <summary class="flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer hover:bg-slate-800/50 transition text-indigo-400 font-black text-[9px] uppercase tracking-widest list-none">
             <span class="flex items-center gap-2">
-              <span class="group-open:rotate-90 transition-transform italic text-indigo-500">▶</span>
+              <span class="group-open:rotate-90 transition-transform text-[8px]">▶</span>
               ${tema}
             </span>
           </summary>
           
-          <ul class="mt-2 space-y-1">
+          <ul class="mt-1 space-y-0.5 border-l border-slate-800 ml-4">
             ${preguntesDelTema
               .map((p, index) => {
-                // CORRECCIÓ CRÍTICA: Forçar String per a una comparació segura
                 const feta = estat.completats
                   .map(String)
                   .includes(String(p.id));
 
-                // Codi a substituir dins de preguntesDelTema.map:
+                // DETECTOR D'EXERCICI ACTIU
+                const esActiva =
+                  estat.preguntaActual &&
+                  String(estat.preguntaActual.id) === String(p.id);
+
                 return `
-               <li class="ml-4 mb-1">
-              <button onclick="seleccionarPreguntaDirecta('${p.id}')" 
-              class="w-full text-left px-3 py-3 rounded-xl transition group
-              ${feta ? "bg-emerald-500/5 border border-emerald-500/20" : "hover:bg-indigo-500/10 border border-transparent"}">
-        
-              <div class="flex items-start gap-3">
-              <span class="mt-0.5">${feta ? "✅" : "⚪"}</span>
-              <div class="flex flex-col">
-              <span class="text-[11px] font-black uppercase tracking-wider ${feta ? "text-emerald-400" : "text-indigo-200 group-hover:text-white"}">
-              Exercici ${p.id}
-              </span>
-               <span class="text-[10px] leading-tight text-slate-400 font-medium mt-1 group-hover:text-slate-300">
-              ${p.descripcio} </span>
-              </div>
-             </div>
-              </button>
-               </li>`;
+                <li class="relative">
+                  <button onclick="seleccionarPreguntaDirecta('${p.id}')" 
+                    class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group
+                    ${esActiva ? "bg-indigo-500/20 border border-indigo-500/30" : "border border-transparent hover:bg-slate-800/40"}">
+                    
+                    <div class="w-5 h-5 shrink-0 flex items-center justify-center rounded-md text-[9px] font-bold border transition-colors
+                      ${
+                        esActiva
+                          ? "bg-indigo-600 border-indigo-500 text-white shadow-[0_0_10px_rgba(79,70,229,0.4)]"
+                          : feta
+                            ? "bg-emerald-500 border-emerald-500 text-white"
+                            : "bg-slate-800 border-slate-700 text-slate-500 group-hover:border-slate-500"
+                      }">
+                      ${feta ? "✓" : index + 1}
+                    </div>
+
+                    <span class="text-[11px] font-bold truncate 
+                      ${esActiva ? "text-indigo-200" : feta ? "text-slate-500" : "text-slate-300 group-hover:text-white"}">
+                      ${p.titol || p.descripcio.substring(0, 25) + "..."}
+                    </span>
+                  </button>
+                </li>`;
               })
               .join("")}
           </ul>
@@ -246,11 +254,14 @@ function seleccionarPreguntaDirecta(id) {
   const pregunta = estat.preguntes.find((p) => String(p.id) === String(id));
 
   if (pregunta) {
-    // 2. Actualitzem l'objecte sencer, no només el tema
+    // 2. Actualitzem l'estat amb la pregunta activa
     estat.temaActiu = pregunta.tema;
     estat.preguntaActual = pregunta;
 
-    // 3. Forcem que la interfície s'actualitzi
+    // 3. ACTUALITZEM EL MENÚ LATERAL (Perquè es pinti el fons lila a l'exercici seleccionat)
+    generarMenuTemes();
+
+    // 4. Forcem que la interfície s'actualitzi
     mostrarSeccio("exercici");
     mostrarPregunta();
 
