@@ -193,9 +193,14 @@ function generarMenuTemes() {
     .map((tema) => {
       const preguntesDelTema = estat.preguntes.filter((p) => p.tema === tema);
 
+      // DETERMINEM SI AQUEST TEMA HA D'ESTAR OBERT
+      // S'obrirà si el tema coincideix amb el de la pregunta que l'usuari està fent ara
+      const esTemaActiu =
+        estat.preguntaActual && estat.preguntaActual.tema === tema;
+
       return `
       <li class="mb-2">
-        <details class="group" open>
+        <details class="group" ${esTemaActiu ? "open" : ""}>
           <summary class="flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer hover:bg-slate-800/50 transition text-indigo-400 font-black text-[9px] uppercase tracking-widest list-none">
             <span class="flex items-center gap-2">
               <span class="group-open:rotate-90 transition-transform text-[8px]">▶</span>
@@ -209,8 +214,6 @@ function generarMenuTemes() {
                 const feta = estat.completats
                   .map(String)
                   .includes(String(p.id));
-
-                // DETECTOR D'EXERCICI ACTIU
                 const esActiva =
                   estat.preguntaActual &&
                   String(estat.preguntaActual.id) === String(p.id);
@@ -221,13 +224,13 @@ function generarMenuTemes() {
                     class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group
                     ${esActiva ? "bg-indigo-500/20 border border-indigo-500/30" : "border border-transparent hover:bg-slate-800/40"}">
                     
-                    <div class="w-5 h-5 shrink-0 flex items-center justify-center rounded-md text-[9px] font-bold border transition-colors
+                    <div class="w-5 h-5 shrink-0 flex items-center justify-center rounded-md text-[9px] font-bold border
                       ${
                         esActiva
                           ? "bg-indigo-600 border-indigo-500 text-white shadow-[0_0_10px_rgba(79,70,229,0.4)]"
                           : feta
                             ? "bg-emerald-500 border-emerald-500 text-white"
-                            : "bg-slate-800 border-slate-700 text-slate-500 group-hover:border-slate-500"
+                            : "bg-slate-800 border-slate-700 text-slate-500"
                       }">
                       ${feta ? "✓" : index + 1}
                     </div>
