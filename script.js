@@ -73,12 +73,28 @@ async function executarAccio() {
 }
 
 function iniciarApp(user) {
+  estat.userActiu = user;
+  // Carreguem els punts que venen de la base de dades a l'estat global
+  estat.punts = user.punts || 0;
+  // Carreguem els exercicis completats
+  estat.completats = user.completats || [];
+
   document.getElementById("modal-login").classList.add("hidden");
-  // Aquí actualitzem el perfil a la barra lateral
   document.getElementById("user-nom").innerText = user.nom;
+
+  const avatarUrl =
+    user.avatar && user.avatar.trim() !== ""
+      ? user.avatar
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=6366f1&color=fff&bold=true`;
+
   document.getElementById("user-icon").innerHTML =
-    `<img src="${user.avatar}" class="w-full h-full object-cover">`;
-  console.log("Sessió iniciada per:", user.nom);
+    `<img src="${avatarUrl}" class="w-full h-full object-cover rounded-full" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=ef4444&color=fff'">`;
+
+  // Carreguem les dades del Sheet i després actualitzem pantalles
+  carregarDadesContables().then(() => {
+    actualitzarDashboard();
+    mostrarSeccio("dashboard");
+  });
 }
 
 // Afegim l'objecte d'estat per controlar l'app--------------------------------------------------------------------------------------------------------
@@ -128,11 +144,19 @@ async function carregarDadesContables() {
 
 // Navegació entre Dashboard i Exercici
 function mostrarSeccio(id) {
-  const seccions = ["seccio-dashboard", "seccio-exercici"];
+  const seccions = ["seccio-dashboard", "seccio-exercici", "seccio-progres"];
+
   seccions.forEach((s) => {
     const el = document.getElementById(s);
-    if (el) el.classList.toggle("hidden", s !== `seccio-${id}`);
+    if (el) {
+      el.classList.toggle("hidden", s !== `seccio-${id}`);
+    }
   });
+
+  // Si la secció és 'progres', executem la funció per pintar les dades
+  if (id === "progres") {
+    mostrarProgres();
+  }
 }
 
 function generarMenuTemes() {
@@ -477,6 +501,7 @@ function ferScrollAlSegüent(idCompletat) {
 estat.punts = 0;
 
 function mostrarExit() {
+  reproduirSoExit();
   const medalla = document.getElementById("medalla-container");
   medalla.classList.remove("hidden");
 
@@ -508,18 +533,56 @@ async function registrarPunts(punts) {
 }
 
 function actualitzarDashboard() {
-  // Busquem l'element de puntuació al Dashboard
+  // 1. Actualitzar Punts (Lògica que ja tenies)
   const elPunts = document.querySelector(
     "#seccio-dashboard .text-3xl.font-black.text-slate-800",
   );
-  if (elPunts) elPunts.innerText = estat.punts;
+  if (elPunts) {
+    elPunts.innerText = estat.punts || 0;
+  }
 
-  // També podem actualitzar el rang basant-nos en els punts
+  // 2. Càlcul de Progrés Real (Basat en exercicis completats)
+  const totalPreguntes = estat.preguntes.length;
+  const fetes = estat.completats.length;
+  const percentatge =
+    totalPreguntes > 0 ? Math.round((fetes / totalPreguntes) * 100) : 0;
+
+  // Actualitzem la barra visual (si tens l'ID al teu HTML)
+  const barra = document.getElementById("barra-progres-dashboard");
+  if (barra) {
+    barra.style.width = `${percentatge}%`;
+  }
+
+  // 3. Actualitzar el Rang (Millorat amb més categories)
   const elRang = document.querySelector("#seccio-dashboard .text-indigo-600");
   if (elRang) {
-    if (estat.punts > 100) elRang.innerText = "A+";
-    else if (estat.punts > 50) elRang.innerText = "B";
-    else elRang.innerText = "C";
+    if (percentatge >= 90) elRang.innerText = "Llegendari (A+)";
+    else if (percentatge >= 50) elRang.innerText = "Expert (B)";
+    else if (percentatge > 0) elRang.innerText = "Aprenent (C)";
+    else elRang.innerText = "Novell";
+  }
+
+  // 4. Actualització de l'Avatar (Evitar imatges trencades)
+  actualitzarAvatarVisual();
+}
+
+// Funció de suport per a l'avatar
+function actualitzarAvatarVisual() {
+  const user = estat.userActiu;
+  if (!user) return;
+
+  const userIconContainer = document.getElementById("user-icon");
+  if (userIconContainer) {
+    // Si l'avatar falla o està buit, usem UI-Avatars amb el nom de l'usuari
+    const avatarUrl =
+      user.avatar && user.avatar.includes("http")
+        ? user.avatar
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=6366f1&color=fff&bold=true`;
+
+    userIconContainer.innerHTML = `
+      <img src="${avatarUrl}" 
+           class="w-full h-full object-cover rounded-full" 
+           onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=ef4444&color=fff'">`;
   }
 }
 
@@ -605,6 +668,68 @@ function carregarSegüentPregunta() {
     alert("🎉 Felicitats! Has completat tots els exercicis de l'Olimpíada.");
     mostrarSeccio("dashboard");
   }
+}
+
+function mostrarProgres() {
+  const container = document.getElementById("llista-progres-temes");
+  if (!container) return;
+
+  // Actualitzem els títols del header de la pàgina
+  const títolHeader = document.getElementById("info-pregunta");
+  const subTítolHeader = document.getElementById("progres-tema");
+  if (títolHeader) títolHeader.innerText = "El Meu Rendiment";
+  if (subTítolHeader) subTítolHeader.innerText = "Estadístiques per tema";
+
+  const temes = [...new Set(estat.preguntes.map((p) => p.tema))];
+
+  container.innerHTML = temes
+    .map((tema) => {
+      const preguntesTema = estat.preguntes.filter((p) => p.tema === tema);
+      const fetesTema = preguntesTema.filter((p) =>
+        estat.completats.map(String).includes(String(p.id)),
+      ).length;
+
+      const percentTema =
+        preguntesTema.length > 0
+          ? Math.round((fetesTema / preguntesTema.length) * 100)
+          : 0;
+
+      return `
+      <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition">
+        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">${tema}</h3>
+        <div class="flex items-end justify-between mb-2">
+          <span class="text-3xl font-black text-slate-800">${percentTema}%</span>
+          <span class="text-[10px] font-bold text-slate-500">${fetesTema} / ${preguntesTema.length} Exercicis</span>
+        </div>
+        <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+          <div class="h-full bg-indigo-500 transition-all duration-1000" style="width: ${percentTema}%"></div>
+        </div>
+      </div>
+    `;
+    })
+    .join("");
+}
+
+function reproduirSoExit() {
+  const context = new (window.AudioContext || window.webkitAudioContext)();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+
+  oscillator.type = "sine"; // So suau
+  oscillator.frequency.setValueAtTime(523.25, context.currentTime); // Nota Do (C5)
+  oscillator.frequency.exponentialRampToValueAtTime(
+    880,
+    context.currentTime + 0.1,
+  ); // Puja a La (A5)
+
+  gain.gain.setValueAtTime(0.1, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.5);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.5);
 }
 
 function logout() {

@@ -203,17 +203,17 @@
               id="progres-tema"
               class="text-[10px] font-black text-indigo-600 uppercase tracking-widest"
             >
-              Selecciona un tema
+              Estadístiques actualitzades
             </p>
             <h2
               id="info-pregunta"
               class="text-xl font-black text-slate-800 italic uppercase"
             >
-              Benvingut
+              El Teu Panell
             </h2>
           </div>
           <button
-            onclick="frescarDades()"
+            onclick="carregarDadesContables()"
             class="p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition border border-slate-200 group"
           >
             🔄
@@ -241,45 +241,74 @@
                 <p
                   class="text-indigo-100 mb-8 max-w-xs text-sm font-medium leading-relaxed"
                 >
-                  Resol casos pràctics reals i visualitza el Llibre Major i el
-                  Balanç en temps real.
+                  Resol casos pràctics reals i visualitza el Llibre Major en
+                  temps real.
                 </p>
                 <button
                   onclick="mostrarSeccio('exercici')"
-                  class="bg-white text-indigo-600 px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50 transition active:scale-95 shadow-xl"
+                  class="bg-white text-indigo-600 px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50 transition shadow-xl"
                 >
                   Començar ara
                 </button>
               </div>
             </div>
+
             <div
-              class="bg-white p-10 rounded-[3rem] shadow-xl border border-slate-100 flex flex-col justify-center"
+              class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-center"
             >
-              <p
-                class="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-2 text-center"
+              <h3
+                class="text-slate-400 text-[10px] font-black uppercase tracking-widest text-center mb-4"
               >
-                Dades de l'usuari
-              </p>
-              <h4
-                class="text-2xl font-black text-slate-800 text-center uppercase italic mb-6"
-              >
-                El teu rendiment
-              </h4>
+                El Teu Rendiment
+              </h3>
               <div class="grid grid-cols-2 gap-4">
-                <div class="p-6 bg-slate-50 rounded-3xl text-center">
-                  <p class="text-[10px] font-black text-slate-400 uppercase">
+                <div class="bg-slate-50 p-4 rounded-2xl text-center">
+                  <p class="text-[9px] font-bold text-slate-400 uppercase">
                     Puntuació
                   </p>
-                  <p class="text-3xl font-black text-slate-800">1.250</p>
-                </div>
-                <div class="p-6 bg-slate-50 rounded-3xl text-center">
-                  <p class="text-[10px] font-black text-slate-400 uppercase">
-                    Ràng
+                  <p id="dash-punts" class="text-3xl font-black text-slate-800">
+                    0
                   </p>
-                  <p class="text-3xl font-black text-indigo-600">A+</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-2xl text-center">
+                  <p class="text-[9px] font-bold text-slate-400 uppercase">
+                    Rang
+                  </p>
+                  <p id="dash-rang" class="text-3xl font-black text-indigo-600">
+                    -
+                  </p>
+                </div>
+              </div>
+              <div class="mt-6">
+                <div
+                  class="flex justify-between text-[9px] font-black text-slate-400 mb-2 uppercase"
+                >
+                  <span>Progrés General</span>
+                  <span id="dash-percent-text">0%</span>
+                </div>
+                <div
+                  class="w-full h-2 bg-slate-100 rounded-full overflow-hidden"
+                >
+                  <div
+                    id="dash-barra"
+                    class="h-full bg-indigo-500 transition-all duration-500"
+                    style="width: 0%"
+                  ></div>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div id="seccio-progres" class="max-w-5xl mx-auto hidden py-10">
+            <h2
+              class="text-3xl font-black text-slate-800 mb-8 uppercase italic"
+            >
+              El meu Progrés detallat
+            </h2>
+            <div
+              id="llista-progres-temes"
+              class="grid grid-cols-1 md:grid-cols-2 gap-6"
+            ></div>
           </div>
 
           <div
@@ -293,7 +322,7 @@
                 id="txt-enunciat"
                 class="text-xl font-medium text-slate-700 italic leading-relaxed"
               >
-                Carregant enunciat...
+                Selecciona un exercici per començar...
               </h2>
             </div>
 
@@ -322,57 +351,67 @@
                       colspan="2"
                       class="p-4 text-right uppercase text-[10px] text-slate-400"
                     >
-                      Totals de l'assentament
+                      Totals
                     </td>
                     <td
                       id="total-deure"
                       class="p-4 text-right text-emerald-600 text-lg"
                     >
-                      0,00 €
+                      0.00 €
                     </td>
                     <td
                       id="total-haver"
                       class="p-4 text-right text-sky-600 text-lg"
                     >
-                      0,00 €
+                      0.00 €
                     </td>
                     <td></td>
                   </tr>
                 </tfoot>
               </table>
-
-            <div class="p-6 bg-slate-100/50 border-t border-slate-200 flex justify-between items-center">
-             <button onclick="afegirFila()" class="text-indigo-600 font-black text-[10px] uppercase tracking-widest hover:text-indigo-800 transition">
-            + Afegir línia
-             </button>
-
-           <div class="flex gap-3">
-            <button id="btn-validar" onclick="validarAssentament()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
-             Validar Assentament
-             </button>
-    
-              <button id="btn-seguent" onclick="carregarSegüentPregunta()" class="bg-slate-200 text-slate-500 px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-300 transition border border-slate-300">
-              Següent Exercici ➡️
-             </button>
-             </div>
-            </div>
-            </div>
-            </div>
-            </div> <div class="mt-1">
-                <div class="flex items-center gap-4 mb-6">
-                    <div class="h-[2px] flex-1 bg-slate-200"></div>
-                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Llibre Major (T-Accounts)</h3>
-                    <div class="h-[2px] flex-1 bg-slate-200"></div>
+              <div
+                class="p-6 bg-slate-100/50 border-t border-slate-200 flex justify-between items-center"
+              >
+                <button
+                  onclick="afegirFila()"
+                  class="text-indigo-600 font-black text-[10px] uppercase tracking-widest"
+                >
+                  + Afegir línia
+                </button>
+                <div class="flex gap-3">
+                  <button
+                    id="btn-validar"
+                    onclick="validarAssentament()"
+                    class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg"
+                  >
+                    Validar
+                  </button>
+                  <button
+                    id="btn-seguent"
+                    onclick="carregarSegüentPregunta()"
+                    class="hidden bg-emerald-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg"
+                  >
+                    Següent ➡️
+                  </button>
                 </div>
-                
-                <div id="majors-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div class="col-span-full text-center py-10 bg-white/50 rounded-3xl border-2 border-dashed border-slate-200">
-                        <p class="text-xs font-bold text-slate-400 italic">Escriu un codi de compte al diari per veure el seu Major aquí.</p>
-                    </div>
-                </div>
+              </div>
             </div>
 
-        </div>
+            <div class="mt-8">
+              <div class="flex items-center gap-4 mb-6">
+                <div class="h-[2px] flex-1 bg-slate-200"></div>
+                <h3
+                  class="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]"
+                >
+                  Llibre Major
+                </h3>
+                <div class="h-[2px] flex-1 bg-slate-200"></div>
+              </div>
+              <div
+                id="majors-container"
+                class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              ></div>
+            </div>
           </div>
         </div>
       </main>
