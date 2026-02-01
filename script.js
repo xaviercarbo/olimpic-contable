@@ -170,6 +170,10 @@ async function carregarDadesContables() {
 function mostrarSeccio(id) {
   const seccions = ["seccio-dashboard", "seccio-exercici", "seccio-progres"];
 
+  // Netegem els filtres del header per defecte
+  const filtreHeader = document.getElementById("filtre-header-container");
+  if (filtreHeader) filtreHeader.innerHTML = "";
+
   seccions.forEach((s) => {
     const el = document.getElementById(s);
     if (el) {
@@ -422,7 +426,6 @@ async function validarAssentament() {
     (line) => line.codi !== "",
   );
 
-  // 1. Càlcul de totals amb arrodoniment per seguretat
   const totalD = assentamentUsuari.reduce(
     (acc, l) => acc + parseFloat(l.deure || 0),
     0,
@@ -432,14 +435,11 @@ async function validarAssentament() {
     0,
   );
 
-  // Comparem amb un marge d'error mínim per evitar problemes de decimals
   if (Math.abs(totalD - totalH) > 0.01 || totalD === 0) {
     alert("⚠️ L'assentament no quadra o està buit.");
     return;
   }
 
-  // 2. Simplificació i normalització de les claus per a la comparació
-  // Forcem 2 decimals (.toFixed(2)) a tot arreu perquè la comparació sigui idèntica
   const simplificar = (arr) =>
     arr
       .map(
@@ -450,10 +450,6 @@ async function validarAssentament() {
 
   const userKeys = simplificar(assentamentUsuari);
   const solKeys = simplificar(solucioEsperada);
-
-  console.log("Usuari:", userKeys); // Per depurar a la consola si falla
-  console.log("Solució:", solKeys);
-
   const esCorrecte = JSON.stringify(userKeys) === JSON.stringify(solKeys);
 
   if (esCorrecte) {
@@ -462,11 +458,10 @@ async function validarAssentament() {
     if (!estat.completats.includes(idActual)) {
       estat.completats.push(idActual);
 
-      // Enviem les dades al Google Sheet
       try {
         await fetch(API_URL, {
           method: "POST",
-          mode: "no-cors", // Evita errors de CORS al bloquejar la resposta
+          mode: "no-cors",
           body: JSON.stringify({
             action: "registrarActivitat",
             nom: estat.userActiu.nom,
@@ -476,18 +471,23 @@ async function validarAssentament() {
           }),
         });
 
-        // Actualitzem punts locals
         estat.punts = (parseInt(estat.punts) || 0) + 10;
         actualitzarDashboard();
       } catch (e) {
         console.error("Error en el registre remot:", e);
       }
 
+      // 1. Actualitzem el menú lateral (el que ja feies)
       generarMenuTemes();
+
+      // 2. NOVA MILLORA: Si la secció de progrés està visible, la refresquem al moment
+      const seccioProgres = document.getElementById("seccio-progres");
+      if (seccioProgres && !seccioProgres.classList.contains("hidden")) {
+        mostrarProgres();
+      }
     }
 
-    mostrarExit(); // Mostra la medalla i passa a la següent
-
+    mostrarExit();
     document.getElementById("btn-validar").classList.add("hidden");
     document.getElementById("btn-seguent").classList.remove("hidden");
   } else {
@@ -732,44 +732,143 @@ function carregarSegüentPregunta() {
   }
 }
 
+// Variable per controlar el filtre (la pots posar fora de la funció)
+let filtreProgres = "tots";
+
 function mostrarProgres() {
   const container = document.getElementById("llista-progres-temes");
+  const filtreHeader = document.getElementById("filtre-header-container");
   if (!container) return;
 
-  // Actualitzem els títols del header de la pàgina
-  const títolHeader = document.getElementById("info-pregunta");
-  const subTítolHeader = document.getElementById("progres-tema");
-  if (títolHeader) títolHeader.innerText = "El Meu Rendiment";
-  if (subTítolHeader) subTítolHeader.innerText = "Estadístiques per tema";
+  // 1. Inyectem els botons al HEADER
+  if (filtreHeader) {
+    filtreHeader.innerHTML = `
+            <button onclick="canviarFiltreProgres('tots')" 
+                class="px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-tighter transition-all ${filtreProgres === "tots" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}">
+                Tots
+            </button>
+            <button onclick="canviarFiltreProgres('pendents')" 
+                class="px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-tighter transition-all ${filtreProgres === "pendents" ? "bg-white text-rose-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}">
+                Pendents
+            </button>
+        `;
+  }
+
+  document.getElementById("info-pregunta").innerText = "El Meu Rendiment";
+  document.getElementById("progres-tema").innerText =
+    "Estadístiques Detallades";
 
   const temes = [...new Set(estat.preguntes.map((p) => p.tema))];
+  const completadesIDs = estat.completats.map(String);
 
   container.innerHTML = temes
     .map((tema) => {
-      const preguntesTema = estat.preguntes.filter((p) => p.tema === tema);
-      const fetesTema = preguntesTema.filter((p) =>
-        estat.completats.map(String).includes(String(p.id)),
+      const totesPreguntesTema = estat.preguntes.filter((p) => p.tema === tema);
+      const totalTema = totesPreguntesTema.length; // Total d'exercicis del tema
+
+      const preguntesPerMostrar =
+        filtreProgres === "pendents"
+          ? totesPreguntesTema.filter(
+              (p) => !completadesIDs.includes(String(p.id)),
+            )
+          : totesPreguntesTema;
+
+      if (filtreProgres === "pendents" && preguntesPerMostrar.length === 0)
+        return "";
+
+      const fetesTema = totesPreguntesTema.filter((p) =>
+        completadesIDs.includes(String(p.id)),
       ).length;
 
       const percentTema =
-        preguntesTema.length > 0
-          ? Math.round((fetesTema / preguntesTema.length) * 100)
-          : 0;
+        totalTema > 0 ? Math.round((fetesTema / totalTema) * 100) : 0;
+
+      // MILLORA: Condició robusta per detectar si el tema està realment acabat
+      const esComplet = fetesTema === totalTema && totalTema > 0;
 
       return `
-      <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition">
-        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">${tema}</h3>
-        <div class="flex items-end justify-between mb-2">
-          <span class="text-3xl font-black text-slate-800">${percentTema}%</span>
-          <span class="text-[10px] font-bold text-slate-500">${fetesTema} / ${preguntesTema.length} Exercicis</span>
-        </div>
-        <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-          <div class="h-full bg-indigo-500 transition-all duration-1000" style="width: ${percentTema}%"></div>
-        </div>
-      </div>
-    `;
+        <div class="bg-white rounded-[2rem] border ${esComplet ? "border-emerald-500 bg-emerald-50/20" : "border-slate-100"} shadow-sm hover:shadow-md transition-all duration-500 overflow-hidden">
+            <details class="group" ${filtreProgres === "pendents" ? "open" : ""}>
+                <summary class="p-8 cursor-pointer list-none outline-none">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="flex items-center gap-2 text-[10px] font-black ${esComplet ? "text-emerald-600" : "text-slate-400"} uppercase tracking-widest mb-1">
+                                ${tema}
+                                ${esComplet ? '<span class="bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[8px]">FINALITZAT</span>' : ""}
+                            </p>
+                            <div class="flex items-center gap-3">
+                                <h3 class="text-3xl font-black ${esComplet ? "text-emerald-700" : "text-slate-900"}">${percentTema}%</h3>
+                                ${esComplet ? '<span class="text-2xl animate-bounce">🏆</span>' : ""}
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-2">
+                            <span class="text-[10px] font-bold ${esComplet ? "text-emerald-700 bg-emerald-100" : "text-slate-500 bg-slate-50"} px-3 py-1 rounded-full border ${esComplet ? "border-emerald-200" : "border-slate-100"}">
+                                ${fetesTema} / ${totalTema} Exercicis
+                            </span>
+                            <span class="text-[9px] font-black text-indigo-500 uppercase tracking-tighter group-open:hidden italic">veure detalls ↓</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full ${esComplet ? "bg-emerald-500" : "bg-indigo-500"} transition-all duration-1000" style="width: ${percentTema}%"></div>
+                    </div>
+                </summary>
+
+                <div class="px-8 pb-8 pt-2 border-t border-slate-50 bg-slate-50/30">
+                    <div class="space-y-2 mt-4">
+                        ${preguntesPerMostrar
+                          .map((p) => {
+                            const esFeta = completadesIDs.includes(
+                              String(p.id),
+                            );
+                            const indexReal =
+                              totesPreguntesTema.findIndex(
+                                (item) => item.id === p.id,
+                              ) + 1;
+                            const títolNetejat =
+                              p.titol ||
+                              (p.descripcio
+                                ? p.descripcio.substring(0, 45) + "..."
+                                : "Assentament " + p.id);
+
+                            return `
+                            <div class="flex items-center justify-between p-3 rounded-2xl border transition-all 
+                                ${esFeta ? "bg-white border-emerald-100 shadow-sm" : "bg-white/50 border-slate-100 opacity-80"}">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-bold
+                                        ${esFeta ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}">
+                                        ${esFeta ? "✓" : indexReal}
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <p class="text-[11px] font-bold ${esFeta ? "text-slate-800" : "text-slate-500"}">${títolNetejat}</p>
+                                        <p class="text-[9px] font-medium uppercase tracking-tighter ${esFeta ? "text-emerald-500" : "text-slate-400"}">
+                                            ${esFeta ? "Completat" : "Pendent"}
+                                        </p>
+                                    </div>
+                                </div>
+                                ${
+                                  !esFeta
+                                    ? `
+                                    <button onclick="seleccionarPreguntaDirecta('${p.id}')" 
+                                        class="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-600 hover:text-white transition-all">
+                                        Resoldre
+                                    </button>
+                                `
+                                    : `<span class="text-[9px] font-black text-emerald-500 pr-2 italic">✓ EXCEL·LENT</span>`
+                                }
+                            </div>`;
+                          })
+                          .join("")}
+                    </div>
+                </div>
+            </details>
+        </div>`;
     })
     .join("");
+}
+
+function canviarFiltreProgres(nouFiltre) {
+  filtreProgres = nouFiltre;
+  mostrarProgres();
 }
 
 function reproduirSoExit() {
