@@ -55,32 +55,54 @@
       class="fixed inset-0 z-[200] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
-        class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full border border-slate-200 text-center"
+        class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full border border-slate-200"
       >
-        <div
-          id="avatar-preview"
-          class="w-24 h-24 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center overflow-hidden border-2 border-indigo-500"
-        >
-          <span class="text-slate-400 text-xs">Avatar</span>
+        <div class="flex gap-4 mb-8 border-b border-slate-100 pb-4">
+          <button
+            onclick="canviarTab('login')"
+            id="tab-login"
+            class="flex-1 font-black text-xs uppercase tracking-widest text-indigo-600"
+          >
+            Entrar
+          </button>
+          <button
+            onclick="canviarTab('registre')"
+            id="tab-registre"
+            class="flex-1 font-black text-xs uppercase tracking-widest text-slate-400"
+          >
+            Nou Usuari
+          </button>
         </div>
-        <h2 class="text-xl font-extrabold mb-2 text-slate-800 italic uppercase">
-          Benvingut/da
-        </h2>
-        <p class="text-slate-500 text-sm mb-6">
-          Selecciona el teu perfil d'estudiant
-        </p>
-        <select
-          id="select-usuari"
-          class="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-700 mb-6 outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="">Carregant usuaris...</option>
-        </select>
-        <button
-          onclick="login()"
-          class="w-full bg-indigo-600 text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg"
-        >
-          Entrar a l'Olimpíada
-        </button>
+
+        <div id="form-usuari" class="space-y-4">
+          <div>
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1"
+              >Nom d'usuari</label
+            >
+            <input
+              type="text"
+              id="nom-input"
+              class="w-full p-3 rounded-xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1"
+              >Contrasenya</label
+            >
+            <input
+              type="password"
+              id="pass-input"
+              class="w-full p-3 rounded-xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            onclick="executarAccio()"
+            id="btn-principal"
+            class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
+          >
+            Entrar a l'Olimpíada
+          </button>
+        </div>
       </div>
     </div>
 
@@ -319,21 +341,42 @@
                 </tfoot>
               </table>
 
-              <div
-                class="p-6 bg-slate-100/50 border-t border-slate-200 flex justify-between items-center"
-              >
-                <button
-                  onclick="afegirFila()"
-                  class="text-indigo-600 font-black text-[10px] uppercase tracking-widest hover:text-indigo-800 transition"
-                >
-                  + Afegir línia
-                </button>
-                <div class="flex gap-3"></div>
-              </div>
+            <div class="p-6 bg-slate-100/50 border-t border-slate-200 flex justify-between items-center">
+             <button onclick="afegirFila()" class="text-indigo-600 font-black text-[10px] uppercase tracking-widest hover:text-indigo-800 transition">
+            + Afegir línia
+             </button>
+
+           <div class="flex gap-3">
+            <button id="btn-validar" onclick="validarAssentament()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
+             Validar Assentament
+             </button>
+    
+              <button id="btn-seguent" onclick="carregarSegüentPregunta()" class="bg-slate-200 text-slate-500 px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-300 transition border border-slate-300">
+              Següent Exercici ➡️
+             </button>
+             </div>
             </div>
+            </div>
+            </div>
+            </div> <div class="mt-1">
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="h-[2px] flex-1 bg-slate-200"></div>
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Llibre Major (T-Accounts)</h3>
+                    <div class="h-[2px] flex-1 bg-slate-200"></div>
+                </div>
+                
+                <div id="majors-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="col-span-full text-center py-10 bg-white/50 rounded-3xl border-2 border-dashed border-slate-200">
+                        <p class="text-xs font-bold text-slate-400 italic">Escriu un codi de compte al diari per veure el seu Major aquí.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
           </div>
         </div>
       </main>
     </div>
+    <script src="script.js"></script>
   </body>
 </html>
