@@ -129,6 +129,21 @@
                 class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
               />
             </div>
+            <div id="contenedor-grup" class="hidden mt-4">
+              <label
+                class="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2"
+              >
+                Assignar Grup
+              </label>
+              <select
+                id="grup-input"
+                class="w-full mt-1 p-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 outline-none text-xs font-bold transition"
+              >
+                <option value="Grup A">Grup A 🍎</option>
+                <option value="Grup B">Grup B 🍏</option>
+              </select>
+            </div>
+
             <div>
               <label
                 class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block"
@@ -186,26 +201,33 @@
             >
               Menú
             </p>
-            <ul class="space-y-1">
-              <li>
-                <button
-                  onclick="mostrarSeccio('dashboard')"
-                  class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300"
-                >
-                  📊 Dashboard
-                </button>
-              </li>
-              <li>
-                <button
-                  onclick="mostrarSeccio('progres')"
-                  class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300"
-                >
-                  📈 Progrés
-                </button>
-              </li>
-            </ul>
           </div>
-
+          <ul class="space-y-1">
+            <li>
+              <button
+                onclick="mostrarSeccio('dashboard')"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300"
+              >
+                📊 Dashboard
+              </button>
+            </li>
+            <li>
+              <button
+                onclick="mostrarSeccio('progres')"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300"
+              >
+                📈 Progrés
+              </button>
+            </li>
+            <li id="item-menu-ranquing" class="hidden">
+              <button
+                onclick="mostrarSeccio('ranquing')"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300"
+              >
+                🏆 Rànquing Global
+              </button>
+            </li>
+          </ul>
           <div>
             <p
               class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 ml-2"
@@ -352,16 +374,56 @@
           </div>
 
           <div id="seccio-progres" class="max-w-5xl mx-auto hidden py-10">
-            <h2
-              class="text-3xl font-black text-slate-800 mb-8 uppercase italic"
+            <div
+              class="flex justify-between items-end mb-8 border-b-2 border-slate-100 pb-4"
             >
-              El meu Progrés detallat
-            </h2>
+              <div>
+                <h2 class="text-3xl font-black text-slate-800 uppercase italic">
+                  El meu Progrés
+                </h2>
+                <p
+                  class="text-slate-500 text-xs font-bold uppercase tracking-wider"
+                >
+                  Resum d'activitat i llibre diari
+                </p>
+              </div>
+
+              <button
+                onclick="generarInformePDF()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Descarregar PDF de la feina
+              </button>
+            </div>
+
             <div
               id="llista-progres-temes"
               class="grid grid-cols-1 md:grid-cols-2 gap-6"
             ></div>
           </div>
+
+          <section id="seccio-ranquing" class="hidden p-6">
+            <div class="max-w-4xl mx-auto">
+              <h2 class="text-2xl font-black text-slate-800 mb-6">
+                🏆 Rànquing de Companys
+              </h2>
+              <div id="contingut-ranquing" class="space-y-3"></div>
+            </div>
+          </section>
 
           <div
             id="seccio-exercici"
@@ -467,7 +529,116 @@
           </div>
         </div>
       </main>
+    </main>
     </div>
+
+    <button
+      onclick="toggleCalculadora()"
+      class="fixed bottom-6 right-6 bg-slate-800 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform z-50"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+        />
+      </svg>
+    </button>
+
+    <div
+      id="calc-iva"
+      class="hidden fixed bottom-24 right-6 w-72 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 overflow-hidden shadow-indigo-200/50"
+    >
+      <div class="bg-indigo-600 p-4 text-white flex justify-between items-center">
+        <span class="text-[10px] font-black uppercase tracking-tighter">Assistent d'IVA</span>
+        <button onclick="toggleCalculadora()" class="hover:rotate-90 transition-transform">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div class="flex bg-slate-100 p-1 rounded-xl">
+          <button
+            id="mode-directe"
+            onclick="setCalcMode('directe')"
+            class="flex-1 py-1.5 text-[9px] font-black uppercase rounded-lg bg-white shadow-sm text-indigo-600 transition-all"
+          >
+            Directe
+          </button>
+          <button
+            id="mode-invers"
+            onclick="setCalcMode('invers')"
+            class="flex-1 py-1.5 text-[9px] font-black uppercase text-slate-500 transition-all"
+          >
+            Invers
+          </button>
+        </div>
+
+        <div class="flex gap-2">
+          <button 
+            onclick="setIvaPerc(0.21, this)" 
+            class="iva-btn flex-1 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold transition-all"
+          >
+            21%
+          </button>
+          <button 
+            onclick="setIvaPerc(0.10, this)" 
+            class="iva-btn flex-1 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold transition-all"
+          >
+            10%
+          </button>
+          <button 
+            onclick="setIvaPerc(0.04, this)" 
+            class="iva-btn flex-1 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold transition-all"
+          >
+            4%
+          </button>
+        </div>
+
+        <div>
+          <label id="label-input" class="text-[9px] font-bold text-slate-400 uppercase ml-1">Import Base</label>
+          <input
+            type="number"
+            id="calc-input"
+            oninput="executarCalculIva()"
+            class="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none p-3 text-lg font-black text-slate-700 transition-all"
+            placeholder="0.00"
+          />
+        </div>
+
+        <div class="grid grid-cols-1 gap-2">
+          <div class="flex justify-between items-center p-3 bg-indigo-50 rounded-2xl border border-indigo-100">
+            <span id="label-res-1" class="text-[9px] font-bold text-indigo-400 uppercase">Quota IVA</span>
+            <div class="flex items-center gap-2">
+              <span id="res-val-1" class="font-black text-indigo-600">0.00€</span>
+              <button onclick="copiarAlPortapapers('res-val-1')" class="text-indigo-300 hover:text-indigo-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center p-3 bg-slate-50 rounded-2xl border border-slate-100">
+            <span id="label-res-2" class="text-[9px] font-bold text-slate-400 uppercase">Total Factura</span>
+            <div class="flex items-center gap-2">
+              <span id="res-val-2" class="font-black text-slate-700">0.00€</span>
+              <button onclick="copiarAlPortapapers('res-val-2')" class="text-slate-300 hover:text-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="script.js"></script>
   </body>
 </html>

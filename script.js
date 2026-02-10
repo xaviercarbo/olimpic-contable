@@ -1,6 +1,20 @@
-const API_URL =
-  "https://script.google.com/macros/s/AKfycbxTzDAVPVbAJoqjMrJT2qRW--xB-ExcHCvM2zqNlC6lDS53N3Lcbt0r6iuEOzKx3Uba/exec"; // <--- ENGANXA LA URL AQUÍ
+// 1. DEFINICIÓ DE L'ESTAT (Netejat de duplicats)
+let estat = {
+  userActiu: null,
+  pgc: [],
+  preguntes: [],
+  temaActiu: null,
+  preguntaActual: null,
+  assentament: [],
+  completats: [],
+  punts: 0,
+  historialPerExportar: [],
+};
 
+let ivaSeleccionat = 0.21;
+
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbwebMSeMYFBiyVwxFgM4Tl8Y9fXK-RsE7ZUxq4Q1P1kFZUyPXciqe6XpCmEs885I6Im/exec"; // <--- ENGANXA LA URL AQUÍ
 let modoActual = "login";
 
 // Canviar entre pestanyes de Login i Registre
@@ -9,22 +23,28 @@ function canviarTab(modo) {
   const btn = document.getElementById("btn-principal");
   const tLogin = document.getElementById("tab-login");
   const tRegistre = document.getElementById("tab-registre");
+  const contenedorGrup = document.getElementById("contenedor-grup"); // Nova línia
 
   if (modo === "login") {
     btn.innerText = "Entrar a l'Olimpíada";
     tLogin.classList.replace("text-slate-400", "text-indigo-600");
     tRegistre.classList.replace("text-indigo-600", "text-slate-400");
+    if (contenedorGrup) contenedorGrup.classList.add("hidden"); // Amagar si és login
   } else {
     btn.innerText = "Crear compte nou";
     tRegistre.classList.replace("text-slate-400", "text-indigo-600");
     tLogin.classList.replace("text-indigo-600", "text-slate-400");
+    if (contenedorGrup) contenedorGrup.classList.remove("hidden"); // Mostrar si és registre
   }
 }
 
-// Funció principal d'enviament
+// Afegeix aquesta funció al teu script.js
 async function executarAccio() {
   const nom = document.getElementById("nom-input").value.trim();
   const pass = document.getElementById("pass-input").value.trim();
+  const grup = document.getElementById("grup-input")
+    ? document.getElementById("grup-input").value
+    : "";
 
   if (!nom || !pass) return alert("Si us plau, omple tots els camps");
 
@@ -33,9 +53,19 @@ async function executarAccio() {
   btn.innerText = "Connectant...";
 
   try {
+    const dadesEnviament = {
+      action: modoActual,
+      nom: nom,
+      pass: pass,
+    };
+
+    if (modoActual === "registre") {
+      dadesEnviament.grup = grup;
+    }
+
     const resposta = await fetch(API_URL, {
       method: "POST",
-      body: JSON.stringify({ action: modoActual, nom: nom, pass: pass }),
+      body: JSON.stringify(dadesEnviament),
     });
 
     const dades = await resposta.json();
@@ -45,20 +75,7 @@ async function executarAccio() {
         alert("✨ Usuari creat amb èxit! Ja pots iniciar sessió.");
         canviarTab("login");
       } else {
-        // --- LOGIN CORRECTE ---
-
-        // 1. Guardem les dades de l'usuari (nom, avatar, punts)
-        const usuariLogin = dades.usuari;
-
-        // 2. Carreguem l'historial d'activitats que ve del full "Progres"
-        // Si no en té cap encara, assignem un array buit []
-        estat.completats = usuariLogin.completats || [];
-
-        // 3. Persistència: Guardem al navegador perquè no calgui fer login cada cop que refresquem
-        localStorage.setItem("olimpic_user", JSON.stringify(usuariLogin));
-
-        // 4. Arrancat de l'interfície
-        iniciarApp(usuariLogin);
+        iniciarApp(dades.usuari);
       }
     } else {
       alert("⚠️ " + dades.message);
@@ -68,81 +85,61 @@ async function executarAccio() {
     console.error(error);
   } finally {
     btn.disabled = false;
-    if (
-      document.getElementById("modal-login").classList.contains("hidden") ===
-      false
-    ) {
-      btn.innerText =
-        modoActual === "login" ? "Entrar a l'Olimpíada" : "Registrar-me";
-    }
+    btn.innerText =
+      modoActual === "login" ? "Entrar a l'Olimpíada" : "Registrar-me";
   }
 }
 
-function iniciarApp(user) {
-  estat.userActiu = user;
-  // Carreguem els punts que venen de la base de dades a l'estat global
-  estat.punts = user.punts || 0;
-  // Carreguem els exercicis completats
-  estat.completats = user.completats || [];
-
-  document.getElementById("modal-login").classList.add("hidden");
-  document.getElementById("user-nom").innerText = user.nom;
-
-  const avatarUrl =
-    user.avatar && user.avatar.trim() !== ""
-      ? user.avatar
-      : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=6366f1&color=fff&bold=true`;
-
-  document.getElementById("user-icon").innerHTML =
-    `<img src="${avatarUrl}" class="w-full h-full object-cover rounded-full" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=ef4444&color=fff'">`;
-
-  // Carreguem les dades del Sheet i després actualitzem pantalles
-  carregarDadesContables().then(() => {
-    actualitzarDashboard();
-    mostrarSeccio("dashboard");
-  });
-}
-
-// Afegim l'objecte d'estat per controlar l'app--------------------------------------------------------------------------------------------------------
-let estat = {
-  userActiu: null,
-  pgc: [],
-  preguntes: [],
-  temaActiu: null,
-  preguntaActual: null,
-  assentament: [], // Aquí guardarem el que l'usuari va escrivint
-  completats: [],
-  punts: 0,
-};
-
-// Modifiquem la funció iniciarApp que ja tenies
 async function iniciarApp(user) {
-  // 1. Assignem l'usuari i el seu progrés guardat a l'estat global
+  console.log("🚀 Iniciant sessió per a:", user.nom);
+
+  // 1. Assignació de l'estat inicial
   estat.userActiu = user;
   estat.punts = parseInt(user.punts) || 0;
   estat.completats = user.completats || [];
+  estat.historialPerExportar = []; // Netegem historial de sessions anteriors
 
-  // 2. Amaguem el login i posem el nom
+  // 2. Interfície d'usuari
   document.getElementById("modal-login").classList.add("hidden");
   document.getElementById("user-nom").innerText = user.nom;
 
-  // 3. Fallback per l'avatar (si no n'hi ha, generem un amb inicials)
-  const avatarUrl =
-    user.avatar && user.avatar.trim() !== ""
-      ? user.avatar
-      : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=6366f1&color=fff&bold=true`;
+  // 3. Permisos de Rànquing
+  const btnRanquing = document.getElementById("item-menu-ranquing");
+  if (btnRanquing) {
+    // Verifiquem si té permís (marcat amb "X" o true al Google Sheets)
+    if (user.veureRanquing === true || user.veureRanquing === "X") {
+      btnRanquing.classList.remove("hidden");
+    } else {
+      btnRanquing.classList.add("hidden");
+    }
+  }
 
-  document.getElementById("user-icon").innerHTML =
-    `<img src="${avatarUrl}" class="w-full h-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=ef4444&color=fff'">`;
+  // 4. Gestió de l'Avatar (Corregit per evitar ERR_FILE_NOT_FOUND)
+  // Verifiquem que user.avatar existeixi i que sembli una URL real (comenci per http)
+  const esUrlValida =
+    user.avatar &&
+    typeof user.avatar === "string" &&
+    user.avatar.toLowerCase().startsWith("http");
 
-  // 4. ESPEREM a que es carreguin totes les preguntes del Google Sheet
-  await carregarDadesContables();
+  const avatarUrl = esUrlValida
+    ? user.avatar
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=6366f1&color=fff&bold=true`;
 
-  // 5. ARA SÍ: Un cop tenim les preguntes, calculem el rendiment real
-  actualitzarDashboard();
+  document.getElementById("user-icon").innerHTML = `
+    <img src="${avatarUrl}" class="w-full h-full object-cover rounded-full" 
+         onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.nom)}&background=ef4444&color=fff'">`;
 
-  // 6. Mostrem la secció final
-  mostrarSeccio("dashboard");
+  // 5. Càrrega del sistema
+  try {
+    await carregarDadesContables();
+    generarMenuTemes();
+    actualitzarDashboard();
+    mostrarSeccio("dashboard");
+    console.log("✅ App carregada correctament.");
+  } catch (error) {
+    console.error("❌ Error carregant l'App:", error);
+    alert("Error en carregar dades remotes.");
+  }
 }
 
 async function carregarDadesContables() {
@@ -166,9 +163,15 @@ async function carregarDadesContables() {
   }
 }
 
-// Navegació entre Dashboard i Exercici
+// Navegació entre Dashboard, Exercici, Progrés i Rànquing
 function mostrarSeccio(id) {
-  const seccions = ["seccio-dashboard", "seccio-exercici", "seccio-progres"];
+  // Afegim 'seccio-ranquing' a la llista per poder-la ocultar/mostrar
+  const seccions = [
+    "seccio-dashboard",
+    "seccio-exercici",
+    "seccio-progres",
+    "seccio-ranquing",
+  ];
 
   // Netegem els filtres del header per defecte
   const filtreHeader = document.getElementById("filtre-header-container");
@@ -177,13 +180,17 @@ function mostrarSeccio(id) {
   seccions.forEach((s) => {
     const el = document.getElementById(s);
     if (el) {
+      // Si la secció coincideix amb la que volem veure, li traiem 'hidden'
       el.classList.toggle("hidden", s !== `seccio-${id}`);
     }
   });
 
-  // Si la secció és 'progres', executem la funció per pintar les dades
+  // Accions específiques segons la secció
   if (id === "progres") {
     mostrarProgres();
+  } else if (id === "ranquing") {
+    // Si la secció és 'ranquing', carreguem les dades dels companys
+    mostrarRanquing();
   }
 }
 
@@ -420,12 +427,16 @@ function renderTaula() {
   renderMajors();
 }
 // Lògica de validació ---------------------------------------------------------------------------------------------------------------
+// Lògica de validació completa -------------------------------------------------------------------------------------------------------
 async function validarAssentament() {
   const solucioEsperada = estat.preguntaActual.solucio;
+
+  // 1. Filtrem les línies buides que l'usuari no ha fet servir
   const assentamentUsuari = estat.assentament.filter(
     (line) => line.codi !== "",
   );
 
+  // 2. Càlcul de totals per verificar si l'assentament quadra
   const totalD = assentamentUsuari.reduce(
     (acc, l) => acc + parseFloat(l.deure || 0),
     0,
@@ -435,11 +446,13 @@ async function validarAssentament() {
     0,
   );
 
+  // 3. Verificació bàsica de partida doble
   if (Math.abs(totalD - totalH) > 0.01 || totalD === 0) {
     alert("⚠️ L'assentament no quadra o està buit.");
     return;
   }
 
+  // 4. Funció per normalitzar i comparar l'assentament de l'usuari amb la solució
   const simplificar = (arr) =>
     arr
       .map(
@@ -455,10 +468,28 @@ async function validarAssentament() {
   if (esCorrecte) {
     const idActual = String(estat.preguntaActual.id);
 
+    // --- MILLORA: GUARDAR DADES PER AL PDF ---
+    // Guardem l'assentament tal com l'ha escrit l'alumne abans de passar al següent
+    if (!estat.historialPerExportar) estat.historialPerExportar = [];
+
+    // Evitem duplicats a l'historial del PDF si l'usuari valida el mateix exercici dos cops
+    const jaExisteixAHistorial = estat.historialPerExportar.some(
+      (h) => h.id === idActual,
+    );
+    if (!jaExisteixAHistorial) {
+      estat.historialPerExportar.push({
+        id: idActual,
+        enunciat: estat.preguntaActual.enunciat,
+        linies: JSON.parse(JSON.stringify(assentamentUsuari)),
+      });
+    }
+
+    // 5. Registre de punts si és la primera vegada que es resol
     if (!estat.completats.includes(idActual)) {
       estat.completats.push(idActual);
 
       try {
+        // Enviament al Google Script (Code.gs)
         await fetch(API_URL, {
           method: "POST",
           mode: "no-cors",
@@ -471,32 +502,51 @@ async function validarAssentament() {
           }),
         });
 
+        // Actualització local de punts i interfície
         estat.punts = (parseInt(estat.punts) || 0) + 10;
         actualitzarDashboard();
+
+        // Refresquem el menú lateral i la secció de progrés detallada
+        generarMenuTemes();
+        const seccioProgres = document.getElementById("seccio-progres");
+        if (seccioProgres && !seccioProgres.classList.contains("hidden")) {
+          mostrarProgres();
+        }
       } catch (e) {
         console.error("Error en el registre remot:", e);
       }
-
-      // 1. Actualitzem el menú lateral (el que ja feies)
-      generarMenuTemes();
-
-      // 2. NOVA MILLORA: Si la secció de progrés està visible, la refresquem al moment
-      const seccioProgres = document.getElementById("seccio-progres");
-      if (seccioProgres && !seccioProgres.classList.contains("hidden")) {
-        mostrarProgres();
-      }
     }
 
+    // 6. Feedback visual de l'èxit
     mostrarExit();
+
+    // 7. Gestió de botons: amaguem "Validar" i mostrem "Següent Exercici"
     document.getElementById("btn-validar").classList.add("hidden");
     document.getElementById("btn-seguent").classList.remove("hidden");
+
+    // 8. Afegim l'assentament completat al mur visual de sota de l'exercici
+    const historialVisual = document.getElementById("majors-container");
+    if (historialVisual) {
+      historialVisual.insertAdjacentHTML(
+        "beforebegin",
+        `
+          <div class="bg-emerald-50 border-l-4 border-emerald-500 p-5 my-6 rounded-r-2xl shadow-sm animate-fade-in">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black">FET</span>
+                <p class="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Exercici ${idActual} Completat</p>
+            </div>
+            <p class="text-sm italic text-slate-600 leading-relaxed">${estat.preguntaActual.enunciat}</p>
+          </div>
+          `,
+      );
+    }
   } else {
+    // Si la solució no és correcta
     alert(
-      "❌ Hi ha algun error en els comptes o els imports. Revisa l'enunciat!",
+      "❌ Hi ha algun error en els comptes o els imports. Revisa l'enunciat o els càlculs de l'IVA!",
     );
   }
 }
-
 // FUNCIÓ AUXILIAR PER AL SCROLL AUTOMÀTIC------------------------------------------------
 function ferScrollAlSegüent(idCompletat) {
   const menu = document.getElementById("menu-temes");
@@ -708,25 +758,25 @@ function renderMajors() {
 }
 
 function carregarSegüentPregunta() {
-  // 1. ELIMINAR OBSTACLES: Si la medalla d'èxit està a la pantalla, la tanquem
-  // per començar el nou exercici amb la pantalla neta.
+  // 1. NETEJA VISUAL: Eliminem la medalla i els missatges de "Exercici Completat" anteriors
   const medalla = document.getElementById("medalla-container");
   if (medalla) medalla.classList.add("hidden");
 
-  // 2. BUSCAR ON SOM: Busquem la posició de l'exercici actual a la llista total (1 al 13)
+  // Eliminem qualsevol bloc verd de feedback anterior per no acumular-los
+  const missatgesAnteriors = document.querySelectorAll(".bg-emerald-50");
+  missatgesAnteriors.forEach((m) => m.remove());
+
+  // 2. BUSCAR ON SOM: Busquem la posició de l'exercici actual
   const indexTotal = estat.preguntes.findIndex(
     (p) => String(p.id) === String(estat.preguntaActual.id),
   );
 
   // 3. DECIDIR EL SEGÜENT PAS:
   if (indexTotal !== -1 && indexTotal < estat.preguntes.length - 1) {
-    // Si NO és l'últim exercici, agafem el següent de la llista
     const següent = estat.preguntes[indexTotal + 1];
-
-    // Fem servir la funció de càrrega que ja tens, que actualitza l'enunciat i buida la taula
+    // Carreguem el següent exercici
     seleccionarPreguntaDirecta(següent.id);
   } else {
-    // Si era l'últim (el 13), avisem i tornem al Dashboard
     alert("🎉 Felicitats! Has completat tots els exercicis de l'Olimpíada.");
     mostrarSeccio("dashboard");
   }
@@ -891,6 +941,239 @@ function reproduirSoExit() {
 
   oscillator.start();
   oscillator.stop(context.currentTime + 0.5);
+}
+
+async function mostrarRanquing(filtreGrup = "Tots") {
+  const container = document.getElementById("contingut-ranquing");
+  if (!container) return;
+
+  // Missatge de càrrega inicial
+  container.innerHTML = `
+    <div class="flex flex-col items-center justify-center p-10 space-y-4">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <p class="font-bold text-slate-400 uppercase text-[10px] tracking-widest text-center">Organitzant classificació...</p>
+    </div>
+  `;
+
+  try {
+    const res = await fetch(`${API_URL}?action=obtenirRanquing`);
+    let companys = await res.json();
+
+    // 1. Apliquem el filtre de grup si cal
+    if (filtreGrup !== "Tots") {
+      companys = companys.filter((c) => c.grup === filtreGrup);
+    }
+
+    // 2. Construïm els botons de filtre
+    const estilsBotons =
+      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 shadow-sm border";
+    const botonsHtml = `
+      <div class="flex justify-center gap-2 mb-10">
+        <button onclick="mostrarRanquing('Tots')" class="${estilsBotons} ${filtreGrup === "Tots" ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-200" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Tots</button>
+        <button onclick="mostrarRanquing('Grup A')" class="${estilsBotons} ${filtreGrup === "Grup A" ? "bg-amber-500 text-white border-amber-500 shadow-amber-200" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup A 🍎</button>
+        <button onclick="mostrarRanquing('Grup B')" class="${estilsBotons} ${filtreGrup === "Grup B" ? "bg-emerald-500 text-white border-emerald-500 shadow-emerald-200" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup B 🍏</button>
+      </div>
+    `;
+
+    // 3. Generem la llista de companys (amb medalles)
+    const llistaHtml =
+      companys.length > 0
+        ? companys
+            .map((c, i) => {
+              let medal =
+                i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1;
+              let bgClass =
+                i === 0
+                  ? "bg-amber-50 border-amber-200"
+                  : i === 1
+                    ? "bg-slate-50 border-slate-200"
+                    : i === 2
+                      ? "bg-orange-50 border-orange-200"
+                      : "bg-white border-slate-100";
+
+              return `
+        <div class="flex items-center justify-between p-4 rounded-2xl border mb-3 transition-transform hover:scale-[1.02] ${bgClass}">
+          <div class="flex items-center gap-4">
+            <div class="w-10 h-10 flex items-center justify-center rounded-full font-black text-xs ${i < 3 ? "bg-white shadow-sm" : "bg-slate-100 text-slate-400"}">
+              ${medal}
+            </div>
+            <div>
+              <p class="font-black text-slate-700 uppercase text-xs tracking-tight">${c.nom}</p>
+              <p class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">${c.grup}</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-xs font-black text-indigo-600 px-3 py-1 bg-white rounded-lg border shadow-sm">${c.punts} PTS</span>
+          </div>
+        </div>
+      `;
+            })
+            .join("")
+        : `<p class="text-center text-slate-400 py-10 italic">No hi ha ningú registrat en aquest grup encara.</p>`;
+
+    container.innerHTML =
+      botonsHtml + `<div class="max-w-xl mx-auto">${llistaHtml}</div>`;
+  } catch (e) {
+    container.innerHTML = `<div class="p-6 bg-red-50 text-red-600 rounded-2xl text-center font-bold">Error carregant dades del servidor</div>`;
+  }
+}
+
+function generarInformePDF() {
+  // 1. Filtrem les preguntes que realment estan completades al Sheets
+  const exercicisResolts = estat.preguntes.filter((p) =>
+    estat.completats.includes(String(p.id)),
+  );
+
+  if (exercicisResolts.length === 0) {
+    alert("Encara no tens cap exercici registrat al núvol!");
+    return;
+  }
+
+  const finestra = window.open("", "_blank");
+
+  // (Estils CSS... pots mantenir els que ja tenies)
+  const estils = `<style>
+    body { font-family: 'Helvetica', sans-serif; color: #334155; padding: 40px; }
+    .header { border-bottom: 4px solid #6366f1; padding-bottom: 20px; margin-bottom: 30px; }
+    .assentament { margin-bottom: 40px; page-break-inside: avoid; }
+    .enunciat { font-size: 13px; font-weight: bold; background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { border: 1px solid #e2e8f0; background: #f1f5f9; padding: 10px; text-align: left; }
+    td { border: 1px solid #e2e8f0; padding: 10px; }
+    .num { text-align: right; font-weight: bold; }
+  </style>`;
+
+  let contingut = `<html><head>${estils}</head><body>
+    <div class="header">
+      <h1>Llibre Diari Oficial</h1>
+      <p>Alumne: ${estat.userActiu.nom} | Grup: ${estat.userActiu.grup}</p>
+    </div>`;
+
+  // 2. Generem les taules basant-nos en la SOLUCIÓ VALIDADA
+  exercicisResolts.forEach((ex, index) => {
+    contingut += `
+      <div class="assentament">
+        <div class="enunciat">Exercici ${ex.id}: ${ex.enunciat}</div>
+        <table>
+          <thead>
+            <tr>
+              <th width="15%">Codi PGC</th>
+              <th width="45%">Compte</th>
+              <th width="20%">Deure</th>
+              <th width="20%">Haver</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ex.solucio
+              .map(
+                (l) => `
+              <tr>
+                <td class="num">${l.codi}</td>
+                <td>${l.nom || "Compte oficial"}</td>
+                <td class="num">${l.deure > 0 ? l.deure.toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : "-"}</td>
+                <td class="num">${l.haver > 0 ? l.haver.toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : "-"}</td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>`;
+  });
+
+  contingut += `</body></html>`;
+  finestra.document.write(contingut);
+  finestra.document.close();
+  setTimeout(() => {
+    finestra.print();
+  }, 500);
+}
+
+let calculadoraMode = "directe"; // o 'invers'
+
+function toggleCalculadora() {
+  const calc = document.getElementById("calc-iva");
+  calc.classList.toggle("hidden");
+}
+
+function setCalcMode(mode) {
+  calculadoraMode = mode;
+  const btnD = document.getElementById("mode-directe");
+  const btnI = document.getElementById("mode-invers");
+  const labelInput = document.getElementById("label-input");
+  const labelRes1 = document.getElementById("label-res-1");
+  const labelRes2 = document.getElementById("label-res-2");
+
+  if (mode === "directe") {
+    btnD.className =
+      "flex-1 py-1.5 text-[9px] font-black uppercase rounded-lg bg-white shadow-sm text-indigo-600 transition-all";
+    btnI.className =
+      "flex-1 py-1.5 text-[9px] font-black uppercase text-slate-500 transition-all";
+    labelInput.innerText = "Import Base";
+    labelRes1.innerText = "IVA (21%)";
+    labelRes2.innerText = "Total Factura";
+  } else {
+    btnI.className =
+      "flex-1 py-1.5 text-[9px] font-black uppercase rounded-lg bg-white shadow-sm text-indigo-600 transition-all";
+    btnD.className =
+      "flex-1 py-1.5 text-[9px] font-black uppercase text-slate-500 transition-all";
+    labelInput.innerText = "Total Factura (IVA inclòs)";
+    labelRes1.innerText = "Base Imposable";
+    labelRes2.innerText = "Quota IVA (21%)";
+  }
+  executarCalculIva();
+}
+
+function executarCalculIva() {
+  const inputElement = document.getElementById("calc-input");
+  const valor = parseFloat(inputElement.value) || 0;
+
+  const res1 = document.getElementById("res-val-1");
+  const res2 = document.getElementById("res-val-2");
+
+  if (calculadoraMode === "directe") {
+    // Càlcul Directe: Base -> IVA i Total
+    const quota = valor * ivaSeleccionat; // Utilitza la variable global corregida
+    const total = valor + quota;
+
+    res1.innerText = quota.toFixed(2) + "€";
+    res2.innerText = total.toFixed(2) + "€";
+  } else {
+    // Càlcul Invers: Total -> Base i IVA
+    const factor = 1 + ivaSeleccionat;
+    const base = valor / factor;
+    const quota = valor - base;
+
+    res1.innerText = base.toFixed(2) + "€";
+    res2.innerText = quota.toFixed(2) + "€";
+  }
+}
+
+function copiarAlPortapapers(id) {
+  const text = document.getElementById(id).innerText.replace("€", "");
+  navigator.clipboard.writeText(text);
+
+  // Feedback ràpid
+  const valElement = document.getElementById(id);
+  const colorOriginal = valElement.className;
+  valElement.className = "font-black text-emerald-500 scale-110 transition-all";
+  setTimeout(() => (valElement.className = colorOriginal), 500);
+}
+
+function setIvaPerc(valor, el) {
+  ivaSeleccionat = valor; // Actualitzem la variable global (0.21, 0.10 o 0.04)
+
+  // Reset de l'estil de tots els botons d'IVA
+  document.querySelectorAll(".iva-btn").forEach((btn) => {
+    btn.classList.remove("bg-indigo-600", "text-white");
+    btn.classList.add("bg-slate-100", "text-slate-600");
+  });
+
+  // Activem el botó clicat
+  el.classList.remove("bg-slate-100", "text-slate-600");
+  el.classList.add("bg-indigo-600", "text-white");
+
+  executarCalculIva(); // Recalculem automàticament
 }
 
 function logout() {
