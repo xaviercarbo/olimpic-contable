@@ -96,8 +96,10 @@ function formatSAP(valor) {
   );
 }
 
-function formatEuro(valor) {
-  if (valor === 0 || isNaN(valor)) return "0,00 €";
+function formatContable(valor) {
+  // Si el valor és pràcticament zero (menys de mig cèntim), forcem 0 positiu
+  if (Math.abs(valor) < 0.005) valor = 0;
+
   return (
     new Intl.NumberFormat("de-DE", {
       minimumFractionDigits: 2,
@@ -105,7 +107,6 @@ function formatEuro(valor) {
     }).format(valor) + " €"
   );
 }
-
 // Canviar entre pestanyes de Login i Registre
 function canviarTab(modo) {
   modoActual = modo;
@@ -1360,41 +1361,50 @@ function mostrarInformesFinancers() {
             let comptesHTML = "";
 
             if (s.esResultat) {
+              // El resultat de l'exercici a l'Excel de P&G ja ve amb el seu signe
               saldoSub = resExercici;
               comptesHTML = `
-            <div class="flex justify-between items-center pl-8 py-1 text-[10px] text-slate-400 italic">
-              <span>(Càlcul P&G)</span>
-              <span class="w-32 text-right">${formatSAP(resExercici)}</span>
-            </div>`;
+          <div class="flex justify-between items-center pl-8 py-1 text-[10px] text-slate-400 italic">
+            <span>(Càlcul P&G)</span>
+            <span class="w-32 text-right">${formatSAP(resExercici)}</span>
+          </div>`;
             } else {
               const codis = Object.keys(saldos).filter((c) => s.regex.test(c));
-              saldoSub = codis.reduce((acc, c) => acc + saldos[c].saldo, 0);
+
+              // Sumem el saldo net (Deure - Haver)
+              const saldoNetGrup = codis.reduce(
+                (acc, c) => acc + saldos[c].saldo,
+                0,
+              );
+
+              // Lògica de signe: A l'actiu volem D-H, al passiu volem H-D
+              saldoSub = esPassiu ? -saldoNetGrup : saldoNetGrup;
+
               comptesHTML = codis
-                .map(
-                  (c) => `
+                .map((c) => {
+                  // El saldo individual també ha de seguir la lògica de la seva banda
+                  const saldoIndividual = esPassiu
+                    ? -saldos[c].saldo
+                    : saldos[c].saldo;
+                  return `
             <div onclick="obrirDrillDown('${c}')" class="flex justify-between items-center pl-8 py-1 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 group">
               <span class="text-[11px] text-slate-600 group-hover:text-indigo-700"><b>${c}</b> ${saldos[c].nom}</span>
-              <span class="w-32 text-right font-mono text-[11px] text-slate-500">${formatSAP(Math.abs(saldos[c].saldo))}</span>
-            </div>`,
-                )
+              <span class="w-32 text-right font-mono text-[11px] text-slate-500">${formatSAP(saldoIndividual)}</span>
+            </div>`;
+                })
                 .join("");
             }
 
-            const valorFinalSub = esPassiu
-              ? s.esResultat
-                ? saldoSub
-                : -saldoSub
-              : saldoSub;
-            sumaSeccio += valorFinalSub;
+            sumaSeccio += saldoSub;
 
             return `
-          <div class="border-b border-slate-100 last:border-0">
-            <div class="flex justify-between items-center px-4 py-2 bg-slate-50/30">
-              <span class="text-[10px] font-bold text-slate-700 uppercase">${s.titol}</span>
-              <span class="w-32 text-right font-mono text-[11px] font-bold">${formatSAP(Math.abs(valorFinalSub))}</span>
-            </div>
-            ${comptesHTML}
-          </div>`;
+        <div class="border-b border-slate-100 last:border-0">
+          <div class="flex justify-between items-center px-4 py-2 bg-slate-50/30">
+            <span class="text-[10px] font-bold text-slate-700 uppercase">${s.titol}</span>
+            <span class="w-32 text-right font-mono text-[11px] font-bold">${formatSAP(saldoSub)}</span>
+          </div>
+          ${comptesHTML}
+        </div>`;
           })
           .join("");
 
@@ -1402,13 +1412,13 @@ function mostrarInformesFinancers() {
         else totalActiuGlobal += sumaSeccio;
 
         return `
-        <div class="mb-4 bg-white border-x border-slate-200">
-          <div class="bg-slate-200/50 px-4 py-1.5 border-y border-slate-200 flex justify-between items-center">
-            <h4 class="text-[10px] font-black text-slate-900 tracking-wider">${seccio.titol}</h4>
-            <span class="w-32 text-right font-mono text-[11px] font-black">${formatSAP(Math.abs(sumaSeccio))}</span>
-          </div>
-          ${htmlSub}
-        </div>`;
+      <div class="mb-4 bg-white border-x border-slate-200">
+        <div class="bg-slate-200/50 px-4 py-1.5 border-y border-slate-200 flex justify-between items-center">
+          <h4 class="text-[10px] font-black text-slate-900 tracking-wider">${seccio.titol}</h4>
+          <span class="w-32 text-right font-mono text-[11px] font-black">${formatSAP(sumaSeccio)}</span>
+        </div>
+        ${htmlSub}
+      </div>`;
       })
       .join("");
   };
