@@ -17,6 +17,95 @@ const API_URL =
   "https://script.google.com/macros/s/AKfycbwebMSeMYFBiyVwxFgM4Tl8Y9fXK-RsE7ZUxq4Q1P1kFZUyPXciqe6XpCmEs885I6Im/exec"; // <--- ENGANXA LA URL AQUÍ
 let modoActual = "login";
 
+// Aquest objecte contindrà tots els epígrafs dels teus PDFs
+// ESTRUCTURA PGC SEGONS ELS TEUS PDFS
+const ESTRUCTURA_PGC_FINAL = {
+  actiu: [
+    {
+      titol: "A) ACTIU NO CORRIENT",
+      sub: [
+        { titol: "I. Immobilitzat intangible", regex: /^(20)/ },
+        { titol: "II. Immobilitzat material", regex: /^(21|23)/ },
+        { titol: "III. Inversions immobiliàries", regex: /^(22)/ },
+        {
+          titol: "V. Inversions financeres a llarg termini",
+          regex: /^(24|25)/,
+        },
+      ],
+    },
+    {
+      titol: "B) ACTIU CORRIENT",
+      sub: [
+        { titol: "II. Existències", regex: /^(3)/ },
+        {
+          titol: "III. Deutors comercials i altres comptes a cobrar",
+          regex: /^(43|44|470|471|472)/,
+        },
+        {
+          titol: "VII. Efectiu i altres actius líquids equivalents",
+          regex: /^(57)/,
+        },
+      ],
+    },
+  ],
+  passiu: [
+    {
+      titol: "A) PATRIMONI NET",
+      sub: [
+        { titol: "I. Capital", regex: /^(10)/ },
+        { titol: "VII. Resultat de l'exercici", esResultat: true }, // Aquí s'integra P&G
+      ],
+    },
+    {
+      titol: "C) PASSIU CORRIENT",
+      sub: [
+        { titol: "III. Deutes a curt termini", regex: /^(51|52)/ },
+        {
+          titol: "V. Creditors comercials i altres comptes a pagar",
+          regex: /^(40|41|475|476|477)/,
+        },
+      ],
+    },
+  ],
+  pig: [
+    {
+      titol: "INGRESSOS D'EXPLOTACIÓ",
+      sub: [
+        { titol: "1. Import net de la xifra de negocis", regex: /^(70)/ },
+        { titol: "5. Altres ingressos d'explotació", regex: /^(75)/ },
+      ],
+    },
+    {
+      titol: "DESPESES D'EXPLOTACIÓ",
+      sub: [
+        { titol: "4. Aprovisionaments", regex: /^(60)/ },
+        { titol: "6. Despeses de personal", regex: /^(64)/ },
+        { titol: "7. Altres despeses d'explotació", regex: /^(62)/ },
+      ],
+    },
+  ],
+};
+
+// FORMAT SAP: 1.250,50 €
+function formatSAP(valor) {
+  return (
+    new Intl.NumberFormat("de-DE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(valor) + " €"
+  );
+}
+
+function formatEuro(valor) {
+  if (valor === 0 || isNaN(valor)) return "0,00 €";
+  return (
+    new Intl.NumberFormat("de-DE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(valor) + " €"
+  );
+}
+
 // Canviar entre pestanyes de Login i Registre
 function canviarTab(modo) {
   modoActual = modo;
@@ -37,7 +126,6 @@ function canviarTab(modo) {
     if (contenedorGrup) contenedorGrup.classList.remove("hidden"); // Mostrar si és registre
   }
 }
-
 // Afegeix aquesta funció al teu script.js
 async function executarAccio() {
   const nom = document.getElementById("nom-input").value.trim();
@@ -141,7 +229,6 @@ async function iniciarApp(user) {
     alert("Error en carregar dades remotes.");
   }
 }
-
 async function carregarDadesContables() {
   try {
     const res = await fetch(API_URL);
@@ -163,34 +250,48 @@ async function carregarDadesContables() {
   }
 }
 
+//--------------------------------
+
 // Navegació entre Dashboard, Exercici, Progrés i Rànquing
 function mostrarSeccio(id) {
-  // Afegim 'seccio-ranquing' a la llista per poder-la ocultar/mostrar
+  // 1. Llista de seccions actualitzada amb 'seccio-informes'
   const seccions = [
     "seccio-dashboard",
     "seccio-exercici",
     "seccio-progres",
     "seccio-ranquing",
+    "seccio-informes", // <--- Afegida
   ];
 
-  // Netegem els filtres del header per defecte
+  // 2. Netegem els filtres del header per defecte
   const filtreHeader = document.getElementById("filtre-header-container");
   if (filtreHeader) filtreHeader.innerHTML = "";
 
+  // 3. Gestionem la visibilitat
   seccions.forEach((s) => {
     const el = document.getElementById(s);
     if (el) {
-      // Si la secció coincideix amb la que volem veure, li traiem 'hidden'
       el.classList.toggle("hidden", s !== `seccio-${id}`);
     }
   });
 
-  // Accions específiques segons la secció
+  // 4. Lògica Responsive
+  const sidebar = document.getElementById("sidebar");
+  if (sidebar && window.innerWidth < 1024) {
+    if (!sidebar.classList.contains("-translate-x-full")) {
+      toggleSidebar();
+    }
+  }
+
+  // 5. Accions específiques segons la secció
   if (id === "progres") {
     mostrarProgres();
   } else if (id === "ranquing") {
-    // Si la secció és 'ranquing', carreguem les dades dels companys
     mostrarRanquing();
+  } else if (id === "informes") {
+    // Quan entrem a informes, executem el motor de càlcul i renderitzat
+    mostrarInformesFinancers();
+  } else if (id === "exercici") {
   }
 }
 
@@ -198,16 +299,20 @@ function generarMenuTemes() {
   const menu = document.getElementById("menu-temes");
   if (!menu) return;
 
-  const temes = [...new Set(estat.preguntes.map((p) => p.tema))];
+  // 1. Corregim l'accés a la columna B (Tema)
+  // Fem servir 'p.Tema' o 'p.tema' per si de cas
+  const temes = [
+    ...new Set(estat.preguntes.map((p) => p.Tema || p.tema)),
+  ].filter(Boolean);
 
   menu.innerHTML = temes
-    .map((tema) => {
-      const preguntesDelTema = estat.preguntes.filter((p) => p.tema === tema);
+    .map((nomTema) => {
+      const preguntesDelTema = estat.preguntes.filter(
+        (p) => (p.Tema || p.tema) === nomTema,
+      );
 
-      // DETERMINEM SI AQUEST TEMA HA D'ESTAR OBERT
-      // S'obrirà si el tema coincideix amb el de la pregunta que l'usuari està fent ara
-      const esTemaActiu =
-        estat.preguntaActual && estat.preguntaActual.tema === tema;
+      // DETERMINEM SI EL TEMA HA D'ESTAR OBERT
+      const esTemaActiu = estat.temaActiu === nomTema;
 
       return `
       <li class="mb-2">
@@ -215,30 +320,41 @@ function generarMenuTemes() {
           <summary class="flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer hover:bg-slate-800/50 transition text-indigo-400 font-black text-[9px] uppercase tracking-widest list-none">
             <span class="flex items-center gap-2">
               <span class="group-open:rotate-90 transition-transform text-[8px]">▶</span>
-              ${tema}
+              ${nomTema}
             </span>
           </summary>
           
           <ul class="mt-1 space-y-0.5 border-l border-slate-800 ml-4">
             ${preguntesDelTema
               .map((p, index) => {
+                // Referència a la columna A (ID_Activitat) i columna H (Descripcio)
+                const idPregunta = p.ID_Activitat || p.id;
+                const descripcioPregunta =
+                  p.Descripcio ||
+                  p.descripcio ||
+                  p.titol ||
+                  `Activitat ${index + 1}`;
+
                 const feta = estat.completats
                   .map(String)
-                  .includes(String(p.id));
+                  .includes(String(idPregunta));
                 const esActiva =
                   estat.preguntaActual &&
-                  String(estat.preguntaActual.id) === String(p.id);
+                  String(
+                    estat.preguntaActual.ID_Activitat ||
+                      estat.preguntaActual.id,
+                  ) === String(idPregunta);
 
                 return `
                 <li class="relative">
-                  <button onclick="seleccionarPreguntaDirecta('${p.id}')" 
+                  <button onclick="seleccionarPreguntaDirecta('${idPregunta}')" 
                     class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group
                     ${esActiva ? "bg-indigo-500/20 border border-indigo-500/30" : "border border-transparent hover:bg-slate-800/40"}">
                     
                     <div class="w-5 h-5 shrink-0 flex items-center justify-center rounded-md text-[9px] font-bold border
                       ${
                         esActiva
-                          ? "bg-indigo-600 border-indigo-500 text-white shadow-[0_0_10px_rgba(79,70,229,0.4)]"
+                          ? "bg-indigo-600 border-indigo-500 text-white"
                           : feta
                             ? "bg-emerald-500 border-emerald-500 text-white"
                             : "bg-slate-800 border-slate-700 text-slate-500"
@@ -248,7 +364,7 @@ function generarMenuTemes() {
 
                     <span class="text-[11px] font-bold truncate 
                       ${esActiva ? "text-indigo-200" : feta ? "text-slate-500" : "text-slate-300 group-hover:text-white"}">
-                      ${p.titol || p.descripcio.substring(0, 25) + "..."}
+                      ${descripcioPregunta}
                     </span>
                   </button>
                 </li>`;
@@ -256,31 +372,33 @@ function generarMenuTemes() {
               .join("")}
           </ul>
         </details>
-      </li>
-    `;
+      </li>`;
     })
     .join("");
 }
 
-// AQUESTA FUNCIÓ ÉS LA QUE FA QUE EL MENÚ FUNCIONI EN CLICAR--------------------------------------------------------------
+// AQUESTA FUNCIÓ ÉS LA QUE FA QUE EL MENÚ FUNCIONI EN CLICAR
 function seleccionarPreguntaDirecta(id) {
   // 1. Busquem la pregunta assegurant que comparem text amb text
-  const pregunta = estat.preguntes.find((p) => String(p.id) === String(id));
+  const pregunta = estat.preguntes.find(
+    (p) => String(p.ID_Activitat || p.id) === String(id),
+  );
 
   if (pregunta) {
-    // 2. Actualitzem l'estat amb la pregunta activa
-    estat.temaActiu = pregunta.tema;
+    // 2. Actualitzem l'estat amb el tema i la pregunta activa
+    estat.temaActiu = pregunta.Tema || pregunta.tema;
     estat.preguntaActual = pregunta;
 
-    // 3. ACTUALITZEM EL MENÚ LATERAL (Perquè es pinti el fons lila a l'exercici seleccionat)
+    // 4. ACTUALITZEM EL MENÚ LATERAL
     generarMenuTemes();
 
-    // 4. Forcem que la interfície s'actualitzi
+    // 5. NAVEGACIÓ I INTERFÍCIE
     mostrarSeccio("exercici");
     mostrarPregunta();
 
-    // Opcional: fem scroll a dalt perquè l'usuari vegi el nou enunciat
-    window.scrollTo(0, 0);
+    // 6. Scroll a dalt i log
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    console.log("Navegant al tema:", estat.temaActiu, "Activitat:", id);
   } else {
     console.error("Error: No s'ha trobat l'ID " + id + " a la base de dades.");
   }
@@ -321,37 +439,41 @@ function mostrarPregunta() {
   const p = estat.preguntaActual;
   if (!p) return;
 
-  // Busquem els botons per ID
+  // DEFINIM EL TEMA ACTIU (Indispensable per filtrar els Majors)
+  estat.temaActiu = p.Tema || p.tema;
+
   const btnValidar = document.getElementById("btn-validar");
   const btnSeguent = document.getElementById("btn-seguent");
-
-  // Si no es troben els botons a l'HTML, la funció s'atura sense donar error de consola
   if (!btnValidar || !btnSeguent) return;
 
-  const jaFeta = estat.completats.includes(p.id);
+  // Comprovem si l'ID ja està a la llista de completats
+  const idActual = String(p.ID || p.id).trim();
+  const jaFeta = estat.completats.includes(idActual);
 
   if (jaFeta) {
-    // Si ja està feta, el botó de validar s'amaga i el de següent és verd
     btnValidar.classList.add("hidden");
     btnSeguent.innerText = "Següent Exercici ➡️";
-    btnSeguent.className =
-      "bg-emerald-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition shadow-lg shadow-emerald-100";
+    btnSeguent.classList.remove("hidden");
   } else {
-    // Si no està feta, es pot validar o saltar (botó gris)
     btnValidar.classList.remove("hidden");
     btnSeguent.innerText = "Saltar Exercici ⏭️";
-    btnSeguent.className =
-      "bg-slate-200 text-slate-500 px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-300 transition border border-slate-300";
+    btnSeguent.classList.remove("hidden");
   }
 
-  // Actualitzem l'enunciat i info
-  document.getElementById("txt-enunciat").innerText = p.enunciat;
-  document.getElementById("info-pregunta").innerText = p.tema;
+  const enunciatEl = document.getElementById("txt-enunciat");
+  const temaEl = document.getElementById("info-pregunta");
+  if (enunciatEl)
+    enunciatEl.innerText = p.Enunciat || p.enunciat || p.Descripcio;
+  if (temaEl) temaEl.innerText = estat.temaActiu;
 
-  // Reset de la taula
+  // --- REFRESC DEL LLIBRE MAJOR ACUMULAT ---
+  // Això mostrarà totes les "T" del tema actual que ja estiguin al Sheet
+
+  // Reset de la taula de treball
   estat.assentament = [];
   afegirFila();
   renderTaula();
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 // Funcionalitat de les respostes  ---
@@ -426,17 +548,13 @@ function renderTaula() {
     totalHaver.toFixed(2) + " €";
   renderMajors();
 }
-// Lògica de validació ---------------------------------------------------------------------------------------------------------------
 // Lògica de validació completa -------------------------------------------------------------------------------------------------------
 async function validarAssentament() {
   const solucioEsperada = estat.preguntaActual.solucio;
-
-  // 1. Filtrem les línies buides que l'usuari no ha fet servir
   const assentamentUsuari = estat.assentament.filter(
     (line) => line.codi !== "",
   );
 
-  // 2. Càlcul de totals per verificar si l'assentament quadra
   const totalD = assentamentUsuari.reduce(
     (acc, l) => acc + parseFloat(l.deure || 0),
     0,
@@ -446,13 +564,11 @@ async function validarAssentament() {
     0,
   );
 
-  // 3. Verificació bàsica de partida doble
   if (Math.abs(totalD - totalH) > 0.01 || totalD === 0) {
     alert("⚠️ L'assentament no quadra o està buit.");
     return;
   }
 
-  // 4. Funció per normalitzar i comparar l'assentament de l'usuari amb la solució
   const simplificar = (arr) =>
     arr
       .map(
@@ -460,23 +576,17 @@ async function validarAssentament() {
           `${l.codi}|${parseFloat(l.deure).toFixed(2)}|${parseFloat(l.haver).toFixed(2)}`,
       )
       .sort();
-
-  const userKeys = simplificar(assentamentUsuari);
-  const solKeys = simplificar(solucioEsperada);
-  const esCorrecte = JSON.stringify(userKeys) === JSON.stringify(solKeys);
+  const esCorrecte =
+    JSON.stringify(simplificar(assentamentUsuari)) ===
+    JSON.stringify(simplificar(solucioEsperada));
 
   if (esCorrecte) {
-    const idActual = String(estat.preguntaActual.id);
+    const idActual = String(
+      estat.preguntaActual.id || estat.preguntaActual.ID,
+    ).trim();
 
-    // --- MILLORA: GUARDAR DADES PER AL PDF ---
-    // Guardem l'assentament tal com l'ha escrit l'alumne abans de passar al següent
-    if (!estat.historialPerExportar) estat.historialPerExportar = [];
-
-    // Evitem duplicats a l'historial del PDF si l'usuari valida el mateix exercici dos cops
-    const jaExisteixAHistorial = estat.historialPerExportar.some(
-      (h) => h.id === idActual,
-    );
-    if (!jaExisteixAHistorial) {
+    // Guardem per al PDF
+    if (!estat.historialPerExportar.some((h) => h.id === idActual)) {
       estat.historialPerExportar.push({
         id: idActual,
         enunciat: estat.preguntaActual.enunciat,
@@ -484,12 +594,11 @@ async function validarAssentament() {
       });
     }
 
-    // 5. Registre de punts si és la primera vegada que es resol
+    // Registre de progrés
     if (!estat.completats.includes(idActual)) {
       estat.completats.push(idActual);
 
       try {
-        // Enviament al Google Script (Code.gs)
         await fetch(API_URL, {
           method: "POST",
           mode: "no-cors",
@@ -497,56 +606,27 @@ async function validarAssentament() {
             action: "registrarActivitat",
             nom: estat.userActiu.nom,
             idActivitat: idActual,
-            tema: estat.preguntaActual.tema,
+            tema: estat.temaActiu,
             punts: 10,
           }),
         });
 
-        // Actualització local de punts i interfície
         estat.punts = (parseInt(estat.punts) || 0) + 10;
         actualitzarDashboard();
-
-        // Refresquem el menú lateral i la secció de progrés detallada
         generarMenuTemes();
-        const seccioProgres = document.getElementById("seccio-progres");
-        if (seccioProgres && !seccioProgres.classList.contains("hidden")) {
-          mostrarProgres();
-        }
       } catch (e) {
         console.error("Error en el registre remot:", e);
       }
     }
 
-    // 6. Feedback visual de l'èxit
     mostrarExit();
-
-    // 7. Gestió de botons: amaguem "Validar" i mostrem "Següent Exercici"
     document.getElementById("btn-validar").classList.add("hidden");
     document.getElementById("btn-seguent").classList.remove("hidden");
-
-    // 8. Afegim l'assentament completat al mur visual de sota de l'exercici
-    const historialVisual = document.getElementById("majors-container");
-    if (historialVisual) {
-      historialVisual.insertAdjacentHTML(
-        "beforebegin",
-        `
-          <div class="bg-emerald-50 border-l-4 border-emerald-500 p-5 my-6 rounded-r-2xl shadow-sm animate-fade-in">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black">FET</span>
-                <p class="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Exercici ${idActual} Completat</p>
-            </div>
-            <p class="text-sm italic text-slate-600 leading-relaxed">${estat.preguntaActual.enunciat}</p>
-          </div>
-          `,
-      );
-    }
   } else {
-    // Si la solució no és correcta
-    alert(
-      "❌ Hi ha algun error en els comptes o els imports. Revisa l'enunciat o els càlculs de l'IVA!",
-    );
+    alert("❌ Hi ha algun error en els comptes o els imports.");
   }
 }
+
 // FUNCIÓ AUXILIAR PER AL SCROLL AUTOMÀTIC------------------------------------------------
 function ferScrollAlSegüent(idCompletat) {
   const menu = document.getElementById("menu-temes");
@@ -758,24 +838,41 @@ function renderMajors() {
 }
 
 function carregarSegüentPregunta() {
-  // 1. NETEJA VISUAL: Eliminem la medalla i els missatges de "Exercici Completat" anteriors
+  // 1. NETEJA VISUAL
+  // Amaguem la medalla de l'èxit anterior
   const medalla = document.getElementById("medalla-container");
   if (medalla) medalla.classList.add("hidden");
 
-  // Eliminem qualsevol bloc verd de feedback anterior per no acumular-los
+  // Eliminem els blocs temporals de "Exercici Completat" (si n'hi ha)
   const missatgesAnteriors = document.querySelectorAll(".bg-emerald-50");
   missatgesAnteriors.forEach((m) => m.remove());
 
-  // 2. BUSCAR ON SOM: Busquem la posició de l'exercici actual
+  // Reset dels botons (tornem a mostrar Validar i amaguem Següent)
+  document.getElementById("btn-validar").classList.remove("hidden");
+  document.getElementById("btn-seguent").classList.add("hidden");
+
+  // 2. BUSCAR LA POSICIÓ ACTUAL
+  const idActual = estat.preguntaActual.ID_Activitat || estat.preguntaActual.id;
+
+  // Filtrem per tema (opcional: si vols que 'Següent' només vagi dins del mateix tema)
+  // Si prefereixes que vagi per ordre absolut de l'Excel, usa estat.preguntes directament
   const indexTotal = estat.preguntes.findIndex(
-    (p) => String(p.id) === String(estat.preguntaActual.id),
+    (p) => String(p.ID_Activitat || p.id) === String(idActual),
   );
 
-  // 3. DECIDIR EL SEGÜENT PAS:
+  // 3. DECIDIR EL SEGÜENT PAS
   if (indexTotal !== -1 && indexTotal < estat.preguntes.length - 1) {
     const següent = estat.preguntes[indexTotal + 1];
-    // Carreguem el següent exercici
-    seleccionarPreguntaDirecta(següent.id);
+
+    // Actualitzem l'estat del tema (per si la següent pregunta és d'un tema nou)
+    estat.temaActiu = següent.Tema || següent.tema;
+    estat.preguntaActual = següent;
+
+    // Mostrem la pregunta (neteja la taula i posa el nou enunciat)
+    mostrarPregunta();
+
+    // Actualitzem el menú perquè la "rodona" de selecció es mogui
+    generarMenuTemes();
   } else {
     alert("🎉 Felicitats! Has completat tots els exercicis de l'Olimpíada.");
     mostrarSeccio("dashboard");
@@ -1174,6 +1271,399 @@ function setIvaPerc(valor, el) {
   el.classList.add("bg-indigo-600", "text-white");
 
   executarCalculIva(); // Recalculem automàticament
+}
+//--- Informes FINANCER -----------------------------------------------------------
+
+// Estats Financers Informes //
+function generarBalançITema() {
+  const container = document.getElementById("seccio-consultes-financeres");
+  const moviments = obtenirTotsElsMovimentsDelTema(); // Dades de estat.preguntes filtrades
+
+  // Classifiquem per "codi de compte"
+  const balanc = { actiu: {}, passiu: {}, p_i_g: {} };
+
+  // ... lògica de classificació ...
+
+  container.innerHTML = `
+    <div class="space-y-4">
+      <h2 class="text-lg font-bold">Balanç de Situació - Tema: ${estat.temaActiu}</h2>
+      ${renderitzarGrupBalanç("ACTIU", balanc.actiu)}
+      ${renderitzarGrupBalanç("PASSIU I PN", balanc.passiu)}
+      <h2 class="text-lg font-bold mt-8">Pèrdues i Guanys</h2>
+      ${renderitzarGrupBalanç("RESULTAT", balanc.p_i_g)}
+    </div>
+  `;
+}
+
+function obtenirMovimentsDetallatsTema() {
+  const temaActual = String(estat.temaActiu || "").trim();
+  const completatsStr = estat.completats.map((id) => String(id).trim());
+
+  const activitats = estat.preguntes.filter((p) => {
+    return (
+      String(p.tema).trim() === temaActual &&
+      completatsStr.includes(String(p.id).trim())
+    );
+  });
+
+  let llistat = [];
+  activitats.forEach((p) => {
+    if (p.solucio && Array.isArray(p.solucio)) {
+      p.solucio.forEach((linia) => {
+        llistat.push({
+          codi: String(linia.codi).trim(),
+          deure: parseFloat(linia.deure || 0),
+          haver: parseFloat(linia.haver || 0),
+          concepte: p.descripcio || p.enunciat || "Assentament", // Aquí usem la teva columna Q
+          id: p.id,
+        });
+      });
+    }
+  });
+  return llistat;
+}
+
+//A. El "Motor" de dades (Processar moviments)
+// Aquesta funció recorrerà totes les activitats resoltes del tema i crearà un "Llistat de Moviments" mestre.
+// 1. Motor per obtenir dades reals de l'Excel
+function mostrarInformesFinancers() {
+  const container = document.getElementById("seccio-informes");
+  if (!container) return;
+
+  const llistaTemes = [
+    ...new Set(estat.preguntes.map((p) => p.Tema || p.tema)),
+  ].filter(Boolean);
+  const moviments = obtenirMovimentsDetallatsTema();
+  const saldos = {};
+  let r_ing = 0,
+    r_des = 0;
+
+  moviments.forEach((m) => {
+    if (!saldos[m.codi])
+      saldos[m.codi] = { nom: cercarNomCompte(m.codi), saldo: 0 };
+    saldos[m.codi].saldo += m.deure - m.haver;
+    if (m.codi.startsWith("7")) r_ing += m.haver - m.deure;
+    if (m.codi.startsWith("6")) r_des += m.deure - m.haver;
+  });
+
+  const resExercici = r_ing - r_des;
+  let totalActiuGlobal = 0;
+  let totalPassiuGlobal = 0;
+
+  const renderTaulaPGC = (bloc, esPassiu = false) => {
+    return bloc
+      .map((seccio) => {
+        let sumaSeccio = 0;
+        const htmlSub = seccio.sub
+          .map((s) => {
+            let saldoSub = 0;
+            let comptesHTML = "";
+
+            if (s.esResultat) {
+              saldoSub = resExercici;
+              comptesHTML = `
+            <div class="flex justify-between items-center pl-8 py-1 text-[10px] text-slate-400 italic">
+              <span>(Càlcul P&G)</span>
+              <span class="w-32 text-right">${formatSAP(resExercici)}</span>
+            </div>`;
+            } else {
+              const codis = Object.keys(saldos).filter((c) => s.regex.test(c));
+              saldoSub = codis.reduce((acc, c) => acc + saldos[c].saldo, 0);
+              comptesHTML = codis
+                .map(
+                  (c) => `
+            <div onclick="obrirDrillDown('${c}')" class="flex justify-between items-center pl-8 py-1 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 group">
+              <span class="text-[11px] text-slate-600 group-hover:text-indigo-700"><b>${c}</b> ${saldos[c].nom}</span>
+              <span class="w-32 text-right font-mono text-[11px] text-slate-500">${formatSAP(Math.abs(saldos[c].saldo))}</span>
+            </div>`,
+                )
+                .join("");
+            }
+
+            const valorFinalSub = esPassiu
+              ? s.esResultat
+                ? saldoSub
+                : -saldoSub
+              : saldoSub;
+            sumaSeccio += valorFinalSub;
+
+            return `
+          <div class="border-b border-slate-100 last:border-0">
+            <div class="flex justify-between items-center px-4 py-2 bg-slate-50/30">
+              <span class="text-[10px] font-bold text-slate-700 uppercase">${s.titol}</span>
+              <span class="w-32 text-right font-mono text-[11px] font-bold">${formatSAP(Math.abs(valorFinalSub))}</span>
+            </div>
+            ${comptesHTML}
+          </div>`;
+          })
+          .join("");
+
+        if (esPassiu) totalPassiuGlobal += sumaSeccio;
+        else totalActiuGlobal += sumaSeccio;
+
+        return `
+        <div class="mb-4 bg-white border-x border-slate-200">
+          <div class="bg-slate-200/50 px-4 py-1.5 border-y border-slate-200 flex justify-between items-center">
+            <h4 class="text-[10px] font-black text-slate-900 tracking-wider">${seccio.titol}</h4>
+            <span class="w-32 text-right font-mono text-[11px] font-black">${formatSAP(Math.abs(sumaSeccio))}</span>
+          </div>
+          ${htmlSub}
+        </div>`;
+      })
+      .join("");
+  };
+
+  container.innerHTML = `
+    <div class="p-8 max-w-7xl mx-auto font-sans bg-white shadow-2xl my-10 border border-slate-300">
+      
+      <div class="flex justify-between items-start mb-10 border-b-2 border-slate-900 pb-6">
+        <div>
+          <h1 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Estats Comptables Oficials</h1>
+          <p class="text-xs text-slate-500 font-bold uppercase tracking-widest">Tema: ${estat.temaActiu} | Exercici 202X</p>
+        </div>
+        <div class="no-print bg-slate-100 p-3 rounded flex items-center gap-3">
+          <span class="text-[10px] font-bold uppercase text-slate-400">Canviar Tema:</span>
+          <select onchange="estat.temaActiu=this.value; mostrarInformesFinancers();" class="text-xs font-bold bg-transparent border-none">
+            ${llistaTemes.map((t) => `<option value="${t}" ${t === estat.temaActiu ? "selected" : ""}>${t}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-0 border border-slate-300">
+        <div class="border-r border-slate-300">
+          <div class="bg-slate-900 text-white p-2 text-center text-xs font-bold uppercase tracking-widest">Actiu (Inversions)</div>
+          ${renderTaulaPGC(ESTRUCTURA_PGC_FINAL.actiu)}
+          <div class="bg-slate-900 text-white p-4 flex justify-between items-center mt-auto">
+            <span class="text-xs font-black uppercase">TOTAL ACTIU</span>
+            <span class="font-mono text-lg font-black">${formatSAP(totalActiuGlobal)}</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col">
+          <div class="bg-slate-800 text-white p-2 text-center text-xs font-bold uppercase tracking-widest">Patrimoni Net i Passiu (Finançament)</div>
+          ${renderTaulaPGC(ESTRUCTURA_PGC_FINAL.passiu, true)}
+          <div class="bg-slate-800 text-white p-4 flex justify-between items-center mt-auto border-t border-slate-600">
+            <span class="text-xs font-black uppercase">TOTAL PATRIMONI I PASSIU</span>
+            <span class="font-mono text-lg font-black">${formatSAP(totalPassiuGlobal)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-12 border border-slate-300">
+        <div class="bg-indigo-900 text-white p-2 text-center text-xs font-bold uppercase tracking-widest italic">Compte de Pèrdues i Guanys (Abreviada)</div>
+        <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-8">
+           <div>
+             <h5 class="text-[10px] font-black text-rose-600 border-b border-rose-100 mb-2 uppercase italic">Deure (Despeses)</h5>
+             ${
+               Object.keys(saldos)
+                 .filter((c) => c.startsWith("6"))
+                 .map(
+                   (c) => `
+               <div class="flex justify-between text-[11px] py-1">
+                 <span>${c} ${saldos[c].nom}</span>
+                 <span class="font-mono">${formatSAP(saldos[c].saldo)}</span>
+               </div>
+             `,
+                 )
+                 .join("") ||
+               '<p class="text-slate-300 italic text-[10px]">Sense despeses</p>'
+             }
+           </div>
+           <div>
+             <h5 class="text-[10px] font-black text-emerald-600 border-b border-emerald-100 mb-2 uppercase italic">Haver (Ingressos)</h5>
+             ${
+               Object.keys(saldos)
+                 .filter((c) => c.startsWith("7"))
+                 .map(
+                   (c) => `
+               <div class="flex justify-between text-[11px] py-1">
+                 <span>${c} ${saldos[c].nom}</span>
+                 <span class="font-mono">${formatSAP(Math.abs(saldos[c].saldo))}</span>
+               </div>
+             `,
+                 )
+                 .join("") ||
+               '<p class="text-slate-300 italic text-[10px]">Sense ingressos</p>'
+             }
+           </div>
+        </div>
+        <div class="bg-slate-100 p-4 border-t border-slate-300 flex justify-between items-center">
+          <span class="text-xs font-black uppercase">RESULTAT DE L'EXERCICI (A-B)</span>
+          <span class="font-mono text-xl font-black ${resExercici >= 0 ? "text-emerald-700" : "text-rose-700"}">${formatSAP(resExercici)}</span>
+        </div>
+      </div>
+    </div>
+    <div id="modal-audit" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[500] flex items-center justify-center p-4"></div>
+  `;
+}
+// B. Generació del Balanç i P&G (Visió SAP)
+// Aquesta funció agrupa els moviments i els presenta com un informe oficial.
+function veureDetallCompte(codi) {
+  // Filtrem els moviments del tema actual per a aquest compte específic
+  const moviments = obtenirMovimentsDetallatsTema().filter(
+    (m) => String(m.codi) === String(codi),
+  );
+  const modal = document.getElementById("modal-drilldown");
+  if (!modal) return;
+
+  let saldoAcu = 0;
+  const files = moviments
+    .map((m) => {
+      saldoAcu += m.deure - m.haver;
+      return `
+      <tr class="text-[10px] border-b border-slate-100 hover:bg-slate-50 transition">
+        <td class="p-3 text-slate-400 font-bold">#${m.id}</td>
+        <td class="p-3 text-slate-600 font-medium max-w-xs truncate">${m.concepte}</td>
+        <td class="p-3 text-right font-mono text-emerald-600">${m.deure > 0 ? m.deure.toFixed(2) : "-"}</td>
+        <td class="p-3 text-right font-mono text-rose-600">${m.haver > 0 ? m.haver.toFixed(2) : "-"}</td>
+        <td class="p-3 text-right font-mono font-black text-slate-800">${saldoAcu.toFixed(2)}€</td>
+      </tr>`;
+    })
+    .join("");
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200">
+      <div class="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-center">
+        <div>
+          <h4 class="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Detall del Major (Drill-down)</h4>
+          <h3 class="text-lg font-black text-slate-800 tracking-tighter uppercase italic">${codi} - ${cercarNomCompte(codi)}</h3>
+        </div>
+        <button onclick="document.getElementById('modal-drilldown').classList.add('hidden')" class="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-100 transition shadow-sm">✕</button>
+      </div>
+      <div class="max-h-[60vh] overflow-y-auto">
+        <table class="w-full text-left border-collapse">
+          <thead class="sticky top-0 bg-white shadow-sm z-10">
+            <tr class="text-[9px] uppercase text-slate-400 font-black border-b border-slate-200">
+              <th class="p-3">Ref</th>
+              <th class="p-3">Concepte de l'apunt</th>
+              <th class="p-3 text-right">Deure</th>
+              <th class="p-3 text-right">Haver</th>
+              <th class="p-3 text-right">Saldo Progressiu</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${files || '<tr><td colspan="5" class="p-10 text-center text-slate-400 italic">No hi ha moviments per a aquest compte.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+         <div class="flex flex-col items-end">
+            <span class="text-[9px] font-black text-slate-400 uppercase">Saldo Final</span>
+            <span class="text-lg font-black text-slate-900">${saldoAcu.toFixed(2)}€</span>
+         </div>
+      </div>
+    </div>  
+  `;
+  modal.classList.remove("hidden");
+}
+
+window.obrirDrillDown = function (codi) {
+  const moviments = obtenirMovimentsDetallatsTema();
+  const movsCompte = moviments.filter((m) => m.codi === codi);
+  const nom = cercarNomCompte(codi);
+  const modal = document.getElementById("modal-audit");
+
+  if (!modal) return;
+
+  let files = movsCompte
+    .map(
+      (m) => `
+    <tr class="border-b border-slate-100 text-[11px] hover:bg-indigo-50/30">
+      <td class="p-3 text-slate-400 font-mono italic">#${m.id}</td>
+      <td class="p-3 font-medium text-slate-700">${m.concepte}</td>
+      <td class="p-3 text-right font-mono text-indigo-600 bg-indigo-50/20">${m.deure > 0 ? formatSAP(m.deure) : "-"}</td>
+      <td class="p-3 text-right font-mono text-rose-600 bg-rose-50/20">${m.haver > 0 ? formatSAP(m.haver) : "-"}</td>
+    </tr>
+  `,
+    )
+    .join("");
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-300 animate-in zoom-in duration-150">
+      <div class="bg-slate-900 p-5 text-white flex justify-between items-center">
+        <div>
+          <h3 class="text-lg font-black uppercase tracking-tighter italic">Auditoria Major: ${codi}</h3>
+          <p class="text-[10px] text-slate-400 font-bold uppercase">${nom}</p>
+        </div>
+        <button onclick="document.getElementById('modal-audit').classList.add('hidden')" class="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-xl">&times;</button>
+      </div>
+      <div class="max-h-[60vh] overflow-y-auto">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-100 sticky top-0 border-b border-slate-300">
+            <tr class="text-[10px] font-black uppercase text-slate-500">
+              <th class="p-3">Ref</th>
+              <th class="p-3">Concepte (Columna Q)</th>
+              <th class="p-3 text-right">Deure (+)</th>
+              <th class="p-3 text-right">Haver (-)</th>
+            </tr>
+          </thead>
+          <tbody>${files}</tbody>
+        </table>
+      </div>
+      <div class="p-5 bg-slate-900 text-white flex justify-between items-center">
+        <span class="text-[10px] font-bold uppercase opacity-60 italic underline">Final Audit Statement</span>
+        <div class="text-right">
+          <span class="text-[10px] font-black uppercase block opacity-60">Saldo Net del Compte</span>
+          <span class="text-2xl font-mono font-black">${formatSAP(movsCompte.reduce((acc, m) => acc + (m.deure - m.haver), 0))}</span>
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.remove("hidden");
+};
+
+function seleccionarTemaDesDeInformes(nouTema) {
+  if (!nouTema) return;
+  estat.temaActiu = nouTema;
+  // Refresquem la vista immediatament
+  mostrarInformesFinancers();
+}
+
+function cercarNomCompte(codi) {
+  if (!estat.pgc) return "Compte " + codi;
+  const compte = estat.pgc.find(
+    (c) => String(c.Codi || c.codi).trim() === String(codi).trim(),
+  );
+  return compte ? compte.Nom || compte.nom : "Compte " + codi;
+}
+
+//--- Informes FINANCER -----------------------------------------------------------
+
+//3. Implementació del Codi (Estructura Resumit)
+function renderitzarSeccioPGC(titol, filtre, saldos) {
+  // Filtrem quins comptes de "saldos" pertanyen a aquest epígraf
+  const comptesSeccio = Object.keys(saldos).filter((codi) => filtre.test(codi));
+  if (comptesSeccio.length === 0) return "";
+
+  let sumaTotal = 0;
+  let htmlComptes = comptesSeccio
+    .map((codi) => {
+      const s = saldos[codi];
+      const saldo = s.deure - s.haver;
+      sumaTotal += saldo;
+      return `
+      <div onclick="veureDetallCompte('${codi}')" class="flex justify-between pl-8 py-1 hover:bg-indigo-50 cursor-pointer text-[10px] border-l-2 border-slate-100 ml-4">
+        <span class="text-slate-600">${codi} - ${s.nom}</span>
+        <span class="font-mono font-bold">${Math.abs(saldo).toFixed(2)}€</span>
+      </div>`;
+    })
+    .join("");
+
+  return `
+    <div class="mb-4">
+      <div class="flex justify-between bg-slate-100 p-2 rounded-lg font-black text-[11px] text-slate-700 uppercase tracking-tighter">
+        <span>${titol}</span>
+        <span>${Math.abs(sumaTotal).toFixed(2)}€</span>
+      </div>
+      <div class="mt-1">${htmlComptes}</div>
+    </div>
+  `;
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  // Simplement afegim o treiem la classe que amaga l'aside
+  sidebar.classList.toggle("-translate-x-full");
 }
 
 function logout() {
