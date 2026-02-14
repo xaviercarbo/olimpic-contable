@@ -14,7 +14,7 @@ let estat = {
 let ivaSeleccionat = 0.21;
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbwebMSeMYFBiyVwxFgM4Tl8Y9fXK-RsE7ZUxq4Q1P1kFZUyPXciqe6XpCmEs885I6Im/exec"; // <--- ENGANXA LA URL AQUÍ
+  "https://script.google.com/macros/s/AKfycbznyEGtz-xHLPvzZFsSTbbtDe7c1avQvd2NoMmkc_D70JjSKvJkIyuWqSdt1KYReQyC/exec"; // <--- ENGANXA LA URL AQUÍ
 let modoActual = "login";
 
 // Aquest objecte contindrà tots els epígrafs dels teus PDFs
@@ -67,27 +67,38 @@ const ESTRUCTURA_PGC_FINAL = {
       ],
     },
   ],
-  pig: [
-    {
-      titol: "INGRESSOS D'EXPLOTACIÓ",
-      sub: [
-        { titol: "1. Import net de la xifra de negocis", regex: /^(70)/ },
-        { titol: "5. Altres ingressos d'explotació", regex: /^(75)/ },
-      ],
-    },
-    {
-      titol: "DESPESES D'EXPLOTACIÓ",
-      sub: [
-        { titol: "4. Aprovisionaments", regex: /^(60)/ },
-        { titol: "6. Despeses de personal", regex: /^(64)/ },
-        { titol: "7. Altres despeses d'explotació", regex: /^(62)/ },
-      ],
-    },
-  ],
 };
+
+const ESTRUCTURA_PYG_PGC = [
+  {
+    titol: "1. Import net de la xifra de negocis",
+    regex: /^(700|701|702|703|704|705|706|708|709)/,
+  },
+  { titol: "2. Variació d'existències i aprovisionaments", regex: /^(60|61)/ },
+  { titol: "3. Altres ingressos d'explotació", regex: /^(74|75)/ },
+  { titol: "4. Despeses de personal", regex: /^(64)/ },
+  { titol: "5. Altres despeses d'explotació", regex: /^(62|63|65|694|695)/ },
+  { titol: "6. Amortització de l'immobilitzat", regex: /^(68)/ },
+  { titol: "A) RESULTAT D'EXPLOTACIÓ", esSubtotal: "explotacio" },
+  { titol: "7. Ingressos financers", regex: /^(76)/ },
+  { titol: "8. Despeses financeres", regex: /^(66)/ },
+  { titol: "B) RESULTAT FINANCER", esSubtotal: "financer" },
+  { titol: "C) RESULTAT ABANS D'IMPOSTOS (A + B) ", esSubtotal: "ebt" },
+  { titol: "9. Impost sobre beneficis", regex: /^(630)/ },
+  { titol: "RESULTAT DE L'EXERCICI (PÈRDUES O GUANYS)", esSubtotal: "final" },
+];
 
 // FORMAT SAP: 1.250,50 €
 function formatSAP(valor) {
+  // 1. Si és pràcticament zero, el convertim en 0 absolut
+  if (Math.abs(valor) < 0.005) {
+    valor = 0;
+  }
+
+  // 2. Truc per eliminar el -0: Sumar 0 a un número -0 el converteix en 0 positiu
+  // També fem un format previ per assegurar que treballem amb el número arrodonit
+  valor = Number(valor.toFixed(2)) + 0;
+
   return (
     new Intl.NumberFormat("de-DE", {
       minimumFractionDigits: 2,
@@ -107,6 +118,14 @@ function formatContable(valor) {
     }).format(valor) + " €"
   );
 }
+
+function formatarNumeroEuropeu(numero) {
+  return new Intl.NumberFormat("de-DE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numero);
+}
+
 // Canviar entre pestanyes de Login i Registre
 function canviarTab(modo) {
   modoActual = modo;
@@ -477,6 +496,8 @@ function mostrarPregunta() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+//------------------------------------------------------------------Taula -------------------------------
+
 // Funcionalitat de les respostes  ---
 // Afegeix una fila buida a l'objecte d'estat i actualitza la taula
 function afegirFila() {
@@ -486,25 +507,64 @@ function afegirFila() {
 
 // Funció per esborrar una línia específica
 function eliminarLinia(index) {
+  // 1. Eliminem de l'array
   estat.assentament.splice(index, 1);
+
+  // 2. Si l'array queda buit, afegim una línia buida per defecte
+  if (estat.assentament.length === 0) {
+    estat.assentament.push({ codi: "", nom: "", deure: 0, haver: 0 });
+  }
+
+  // 3. Renderitzem la taula de nou
   renderTaula();
 }
 
 // Quan l'usuari canvia una dada a la taula
 function updateLinia(index, camp, valor) {
-  let linia = estat.assentament[index];
-  linia[camp] = valor;
+  if (!estat.assentament[index]) return;
 
-  // Si l'usuari ha escrit el codi, busquem el nom al PGC automàticament
+  // 1. Actualitzem la dada a la memòria
+  estat.assentament[index][camp] = valor;
+
+  // 2. Busquem la fila a la pantalla per fer canvis visuals directes
+  const fila = document.querySelector(`tr[data-index="${index}"]`);
+  if (!fila) return;
+
+  // 3. Si canvia el CODI, busquem el nom i l'actualitzem a la pantalla
   if (camp === "codi") {
-    const compteTrobat = estat.pgc.find((c) => c.codi === valor);
-    linia.nom = compteTrobat ? compteTrobat.nom : "Compte no trobat";
+    const compteTrobat = estat.pgc.find(
+      (c) => String(c.codi) === String(valor),
+    );
+    const nomNet = compteTrobat ? compteTrobat.nom : "Compte no trobat";
+    estat.assentament[index].nom = nomNet;
+
+    // Busquem l'element on es mostra el nom (assegura't que tingui la classe 'nom-compte')
+    const cel·laNom = fila.querySelector(".nom-compte");
+    if (cel·laNom) cel·laNom.innerText = nomNet;
   }
 
-  renderTaula();
+  // 4. LÒGICA D'EXCLUSIVITAT (Neteja visual d'imports)
+  if (camp === "deure" && parseFloat(valor) > 0) {
+    estat.assentament[index].haver = 0;
+    const inputHaver = fila.querySelector(".input-haver");
+    if (inputHaver) inputHaver.value = "";
+  } else if (camp === "haver" && parseFloat(valor) > 0) {
+    estat.assentament[index].deure = 0;
+    const inputDeure = fila.querySelector(".input-deure");
+    if (inputDeure) inputDeure.value = "";
+  }
 }
 
-// Dibuixa la taula a l'HTML basant-se en l'objecte 'estat.assentament'
+// Funció auxiliar per formatar números (1.234.567,89 €)
+function formatarMoneda(valor) {
+  return (
+    new Intl.NumberFormat("de-DE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(valor) + " €"
+  );
+}
+
 function renderTaula() {
   const body = document.getElementById("diari-body");
   if (!body) return;
@@ -518,87 +578,147 @@ function renderTaula() {
       totalHaver += parseFloat(linia.haver || 0);
 
       return `
-        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-            <td class="p-2">
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100" data-index="${idx}">
+            <td class="p-2 w-32">
                 <input type="text" list="pgc-list" value="${linia.codi}" 
                     onchange="updateLinia(${idx}, 'codi', this.value)"
-                    class="w-full p-2 outline-none font-bold text-indigo-600 bg-transparent focus:border-b focus:border-indigo-300">
+                    class="select-compte w-full p-2 outline-none font-bold text-xl text-indigo-600 bg-transparent focus:ring-2 focus:ring-indigo-200 rounded">
             </td>
-            <td class="p-2 text-slate-500 text-xs">${linia.nom}</td>
+            <td class="p-2 text-slate-500 text-sm font-medium nom-compte">${linia.nom}</td>
+            
             <td class="p-2">
-                <input type="number" value="${linia.deure || ""}" placeholder="0.00"
-                    onchange="updateLinia(${idx}, 'deure', this.value)" 
-                    class="w-full text-right p-2 outline-none text-emerald-700 font-bold bg-transparent">
+                <div class="flex flex-col">
+                    <div class="flex items-center bg-emerald-50 rounded px-2">
+                        <input type="number" step="0.01" value="${linia.deure || ""}" placeholder="0,00"
+                            oninput="actualitzarLecturaBona(this)"
+                            onchange="updateLinia(${idx}, 'deure', this.value)" 
+                            class="input-deure w-full text-right p-3 outline-none text-2xl text-emerald-700 font-bold bg-transparent">
+                        <span class="ml-1 text-emerald-400 font-bold text-xl">€</span>
+                    </div>
+                    <div class="lectura-formatada text-right text-[11px] text-emerald-500 font-mono mt-1 h-4 px-2">
+                        ${linia.deure > 0 ? formatarMoneda(linia.deure) : ""}
+                    </div>
+                </div>
             </td>
+
             <td class="p-2">
-                <input type="number" value="${linia.haver || ""}" placeholder="0.00"
-                    onchange="updateLinia(${idx}, 'haver', this.value)" 
-                    class="w-full text-right p-2 outline-none text-sky-700 font-bold bg-transparent">
+                <div class="flex flex-col">
+                    <div class="flex items-center bg-sky-50 rounded px-2">
+                        <input type="number" step="0.01" value="${linia.haver || ""}" placeholder="0,00"
+                            oninput="actualitzarLecturaBona(this)"
+                            onchange="updateLinia(${idx}, 'haver', this.value)" 
+                            class="input-haver w-full text-right p-3 outline-none text-2xl text-sky-700 font-bold bg-transparent">
+                        <span class="ml-1 text-sky-400 font-bold text-xl">€</span>
+                    </div>
+                    <div class="lectura-formatada text-right text-[11px] text-sky-500 font-mono mt-1 h-4 px-2">
+                        ${linia.haver > 0 ? formatarMoneda(linia.haver) : ""}
+                    </div>
+                </div>
             </td>
+
             <td class="p-2 text-center">
-                <button onclick="eliminarLinia(${idx})" class="text-slate-300 hover:text-rose-500 transition">✕</button>
+                <button onclick="eliminarLinia(${idx})" class="text-slate-300 hover:text-rose-500 transition text-2xl">✕</button>
             </td>
         </tr>`;
     })
     .join("");
 
-  // Actualitzem els totals a la part inferior
-  document.getElementById("total-deure").innerText =
-    totalDeure.toFixed(2) + " €";
-  document.getElementById("total-haver").innerText =
-    totalHaver.toFixed(2) + " €";
+  const elTotalDeure = document.getElementById("total-deure");
+  const elTotalHaver = document.getElementById("total-haver");
+
+  elTotalDeure.innerText = formatarMoneda(totalDeure);
+  elTotalHaver.innerText = formatarMoneda(totalHaver);
+
+  elTotalDeure.className = "text-3xl font-black text-emerald-700";
+  elTotalHaver.className = "text-3xl font-black text-sky-700";
+
   renderMajors();
 }
-// Lògica de validació completa -------------------------------------------------------------------------------------------------------
+
+// Afegeix també aquesta funció per fer el visor dinàmic
+function actualitzarLecturaBona(el) {
+  const valor = parseFloat(el.value) || 0;
+  const visor = el
+    .closest("div")
+    .parentElement.querySelector(".lectura-formatada");
+  if (valor > 0) {
+    visor.innerText = formatarMoneda(valor);
+  } else {
+    visor.innerText = "";
+  }
+}
+// VALIDAR -----------------------------------------------------VALIDAR
 async function validarAssentament() {
-  const solucioEsperada = estat.preguntaActual.solucio;
-  const assentamentUsuari = estat.assentament.filter(
-    (line) => line.codi !== "",
-  );
+  // 1. LECTURA DELS INPUTS DE LA TAULA
+  const filesTaula = document.querySelectorAll("#diari-body tr");
+  const dadesUsuari = [];
 
-  const totalD = assentamentUsuari.reduce(
-    (acc, l) => acc + parseFloat(l.deure || 0),
-    0,
-  );
-  const totalH = assentamentUsuari.reduce(
-    (acc, l) => acc + parseFloat(l.haver || 0),
-    0,
-  );
+  filesTaula.forEach((fila) => {
+    const codi = fila.querySelector(".select-compte")?.value.trim() || "";
+    const deure = parseFloat(fila.querySelector(".input-deure")?.value) || 0;
+    const haver = parseFloat(fila.querySelector(".input-haver")?.value) || 0;
 
-  if (Math.abs(totalD - totalH) > 0.01 || totalD === 0) {
+    if (codi !== "" && (deure > 0 || haver > 0)) {
+      dadesUsuari.push({
+        codi: String(codi),
+        deure: Number(deure.toFixed(2)),
+        haver: Number(haver.toFixed(2)),
+      });
+    }
+  });
+
+  // 2. QUADRATURA BÀSICA
+  const tD = dadesUsuari.reduce((a, l) => a + l.deure, 0);
+  const tH = dadesUsuari.reduce((a, l) => a + l.haver, 0);
+
+  if (Math.abs(tD - tH) > 0.01 || dadesUsuari.length === 0) {
     alert("⚠️ L'assentament no quadra o està buit.");
     return;
   }
 
-  const simplificar = (arr) =>
-    arr
-      .map(
-        (l) =>
-          `${l.codi}|${parseFloat(l.deure).toFixed(2)}|${parseFloat(l.haver).toFixed(2)}`,
-      )
-      .sort();
-  const esCorrecte =
-    JSON.stringify(simplificar(assentamentUsuari)) ===
-    JSON.stringify(simplificar(solucioEsperada));
+  // 3. FUNCIÓ DE NORMALITZACIÓ PER COMPARAR
+  const normalitzar = (arr) => {
+    if (!arr) return "[]";
+    return JSON.stringify(
+      arr
+        .filter((l) => l.codi && (Number(l.deure) > 0 || Number(l.haver) > 0))
+        .map((l) => ({
+          c: String(l.codi).trim(),
+          d: Number(l.deure).toFixed(2),
+          h: Number(l.haver).toFixed(2),
+        }))
+        .sort((a, b) => (a.c + a.d + a.h).localeCompare(b.c + b.d + b.h)),
+    );
+  };
 
-  if (esCorrecte) {
+  const solucioEsperada = estat.preguntaActual.solucio;
+
+  const stringUsuari = normalitzar(dadesUsuari);
+  const stringSolucio = normalitzar(solucioEsperada);
+
+  // DEBUG: Això t'ajudarà a veure l'error a la consola del navegador (F12)
+  console.log("USUARI:", stringUsuari);
+  console.log("SOLUCIÓ:", stringSolucio);
+
+  if (stringUsuari === stringSolucio) {
+    // --- TOT CORRECTE ---
+    estat.assentament = dadesUsuari;
     const idActual = String(
       estat.preguntaActual.id || estat.preguntaActual.ID,
     ).trim();
 
-    // Guardem per al PDF
+    // Guardar per a PDF
     if (!estat.historialPerExportar.some((h) => h.id === idActual)) {
       estat.historialPerExportar.push({
         id: idActual,
         enunciat: estat.preguntaActual.enunciat,
-        linies: JSON.parse(JSON.stringify(assentamentUsuari)),
+        linies: JSON.parse(JSON.stringify(dadesUsuari)),
       });
     }
 
-    // Registre de progrés
+    // Punts i registre
     if (!estat.completats.includes(idActual)) {
       estat.completats.push(idActual);
-
       try {
         await fetch(API_URL, {
           method: "POST",
@@ -611,12 +731,11 @@ async function validarAssentament() {
             punts: 10,
           }),
         });
-
         estat.punts = (parseInt(estat.punts) || 0) + 10;
         actualitzarDashboard();
         generarMenuTemes();
       } catch (e) {
-        console.error("Error en el registre remot:", e);
+        console.error(e);
       }
     }
 
@@ -624,8 +743,25 @@ async function validarAssentament() {
     document.getElementById("btn-validar").classList.add("hidden");
     document.getElementById("btn-seguent").classList.remove("hidden");
   } else {
-    alert("❌ Hi ha algun error en els comptes o els imports.");
+    alert(
+      "❌ L'assentament encara té algun error en els comptes o els imports.",
+    );
   }
+}
+// VALIDAR -----------------------------------------------------VALIDAR
+
+function actualitzarLecturaBona(el) {
+  const valor = parseFloat(el.value) || 0;
+  const visor = el
+    .closest("div")
+    .parentElement.querySelector(".lectura-formatada");
+  if (valor > 0) {
+    visor.innerText = formatarMoneda(valor);
+  } else {
+    visor.innerText = "";
+  }
+  // També aprofitem per actualitzar els totals de sota en temps real
+  actualitzarTotalsEnTempsReal();
 }
 
 // FUNCIÓ AUXILIAR PER AL SCROLL AUTOMÀTIC------------------------------------------------
@@ -1040,40 +1176,66 @@ function reproduirSoExit() {
   oscillator.start();
   oscillator.stop(context.currentTime + 0.5);
 }
+// ----- Mostrar Ranquing ---------------------
+// 1. Variable global per guardar les dades un cop descarregades
+let dadesRanquingCache = null;
+
+async function refrescarDadesRanquing() {
+  // 1. Esborrem la memòria cau
+  dadesRanquingCache = null;
+  // 2. Cridem a la funció de renderitzat (ella sola farà el fetch al veure que no hi ha cache)
+  await mostrarRanquing("Tots");
+}
 
 async function mostrarRanquing(filtreGrup = "Tots") {
   const container = document.getElementById("contingut-ranquing");
   if (!container) return;
 
-  // Missatge de càrrega inicial
-  container.innerHTML = `
-    <div class="flex flex-col items-center justify-center p-10 space-y-4">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      <p class="font-bold text-slate-400 uppercase text-[10px] tracking-widest text-center">Organitzant classificació...</p>
-    </div>
-  `;
+  // Si ja tenim dades, no posem el spinner de càrrega per evitar parpelleigs
+  if (!dadesRanquingCache) {
+    container.innerHTML = `
+      <div class="flex flex-col items-center justify-center p-10 space-y-4">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <p class="font-bold text-slate-400 uppercase text-[10px] tracking-widest text-center">Organitzant classificació...</p>
+      </div>`;
+  }
 
   try {
-    const res = await fetch(`${API_URL}?action=obtenirRanquing`);
-    let companys = await res.json();
+    // 2. Només fem el fetch si no tenim les dades a la memòria
+    if (!dadesRanquingCache) {
+      const res = await fetch(`${API_URL}?action=obtenirRanquing`);
+      dadesRanquingCache = await res.json();
+    }
 
-    // 1. Apliquem el filtre de grup si cal
+    // 3. Treballem amb una còpia per filtrar
+    let companys = [...dadesRanquingCache];
+
     if (filtreGrup !== "Tots") {
       companys = companys.filter((c) => c.grup === filtreGrup);
     }
 
-    // 2. Construïm els botons de filtre
+    // --- CONSTRUCCIÓ DE L'HTML (Mateixa lògica però més ràpida) ---
     const estilsBotons =
       "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 shadow-sm border";
-    const botonsHtml = `
-      <div class="flex justify-center gap-2 mb-10">
-        <button onclick="mostrarRanquing('Tots')" class="${estilsBotons} ${filtreGrup === "Tots" ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-200" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Tots</button>
-        <button onclick="mostrarRanquing('Grup A')" class="${estilsBotons} ${filtreGrup === "Grup A" ? "bg-amber-500 text-white border-amber-500 shadow-amber-200" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup A 🍎</button>
-        <button onclick="mostrarRanquing('Grup B')" class="${estilsBotons} ${filtreGrup === "Grup B" ? "bg-emerald-500 text-white border-emerald-500 shadow-emerald-200" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup B 🍏</button>
-      </div>
-    `;
 
-    // 3. Generem la llista de companys (amb medalles)
+    // He tret la crida recursiva directa dels botons per un sistema més net
+    const botonsHtml = `
+  <div class="flex flex-col items-center mb-10">
+    <div class="flex justify-center gap-2 mb-4">
+      <button onclick="mostrarRanquing('Tots')" class="${estilsBotons} ${filtreGrup === "Tots" ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-100" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Tots</button>
+      <button onclick="mostrarRanquing('Grup A')" class="${estilsBotons} ${filtreGrup === "Grup A" ? "bg-amber-500 text-white border-amber-500 shadow-amber-100" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup A 🍎</button>
+      <button onclick="mostrarRanquing('Grup B')" class="${estilsBotons} ${filtreGrup === "Grup B" ? "bg-emerald-500 text-white border-emerald-500 shadow-emerald-100" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup B 🍏</button>
+    </div>
+    
+    <button onclick="refrescarDadesRanquing()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-300 border border-transparent hover:border-indigo-100">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+      Sincronitzar dades
+    </button>
+  </div>
+`;
+
     const llistaHtml =
       companys.length > 0
         ? companys
@@ -1090,31 +1252,47 @@ async function mostrarRanquing(filtreGrup = "Tots") {
                       : "bg-white border-slate-100";
 
               return `
-        <div class="flex items-center justify-between p-4 rounded-2xl border mb-3 transition-transform hover:scale-[1.02] ${bgClass}">
-          <div class="flex items-center gap-4">
-            <div class="w-10 h-10 flex items-center justify-center rounded-full font-black text-xs ${i < 3 ? "bg-white shadow-sm" : "bg-slate-100 text-slate-400"}">
-              ${medal}
-            </div>
-            <div>
-              <p class="font-black text-slate-700 uppercase text-xs tracking-tight">${c.nom}</p>
-              <p class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">${c.grup}</p>
-            </div>
-          </div>
-          <div class="text-right">
-            <span class="text-xs font-black text-indigo-600 px-3 py-1 bg-white rounded-lg border shadow-sm">${c.punts} PTS</span>
-          </div>
-        </div>
-      `;
+            <div class="flex items-center justify-between p-4 rounded-2xl border mb-3 transition-all hover:shadow-md ${bgClass}">
+              <div class="flex items-center gap-4">
+                <div class="w-10 h-10 flex items-center justify-center rounded-full font-black text-xs ${i < 3 ? "bg-white shadow-sm" : "bg-slate-100 text-slate-400"}">
+                  ${medal}
+                </div>
+                <div>
+                  <p class="font-black text-slate-700 uppercase text-xs tracking-tight">${c.nom}</p>
+                  <p class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">${c.grup}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-black text-indigo-600 px-3 py-1 bg-white rounded-lg border shadow-sm">${c.punts} PTS</span>
+              </div>
+            </div>`;
             })
             .join("")
-        : `<p class="text-center text-slate-400 py-10 italic">No hi ha ningú registrat en aquest grup encara.</p>`;
+        : `<p class="text-center text-slate-400 py-10 italic">No hi ha dades.</p>`;
 
     container.innerHTML =
-      botonsHtml + `<div class="max-w-xl mx-auto">${llistaHtml}</div>`;
+      botonsHtml +
+      `<div class="max-w-xl mx-auto animate-in fade-in duration-500">${llistaHtml}</div>`;
   } catch (e) {
-    container.innerHTML = `<div class="p-6 bg-red-50 text-red-600 rounded-2xl text-center font-bold">Error carregant dades del servidor</div>`;
+    console.error("Error al rànquing:", e);
+    container.innerHTML = `<div class="p-6 bg-red-50 text-red-600 rounded-2xl text-center font-bold">Error de connexió</div>`;
   }
 }
+
+// 4. OPCIONAL: Funció per forçar actualització si volem dades fresques
+// Funció per forçar la recàrrega de dades reals de Google Sheets
+async function refrescarDadesRanquing() {
+  dadesRanquingCache = null; // Buidem la memòria temporal
+  await mostrarRanquing(); // Tornem a executar la funció original
+}
+
+// Actualitza el rànquing automàticament cada 5 minuts (300.000 ms)
+setInterval(() => {
+  console.log("Actualitzant rànquing en segon pla...");
+  refrescarDadesRanquing();
+}, 300000);
+
+// ----- Mostrar Ranquing ---------------------
 
 function generarInformePDF() {
   // 1. Filtrem les preguntes que realment estan completades al Sheets
@@ -1325,8 +1503,7 @@ function obtenirMovimentsDetallatsTema() {
 }
 
 //A. El "Motor" de dades (Processar moviments)
-// Aquesta funció recorrerà totes les activitats resoltes del tema i crearà un "Llistat de Moviments" mestre.
-// 1. Motor per obtenir dades reals de l'Excel
+// 1. ESTRUCTURA DE PÈRDUES I GUANYS SEGONS EL PGC
 function mostrarInformesFinancers() {
   const container = document.getElementById("seccio-informes");
   if (!container) return;
@@ -1334,6 +1511,7 @@ function mostrarInformesFinancers() {
   const llistaTemes = [
     ...new Set(estat.preguntes.map((p) => p.Tema || p.tema)),
   ].filter(Boolean);
+
   const moviments = obtenirMovimentsDetallatsTema();
   const saldos = {};
   let r_ing = 0,
@@ -1341,16 +1519,26 @@ function mostrarInformesFinancers() {
 
   moviments.forEach((m) => {
     if (!saldos[m.codi])
-      saldos[m.codi] = { nom: cercarNomCompte(m.codi), saldo: 0 };
+      saldos[m.codi] = {
+        nom: cercarNomCompte(m.codi),
+        saldo: 0,
+        deure: 0,
+        haver: 0,
+      };
+
+    saldos[m.codi].deure += m.deure;
+    saldos[m.codi].haver += m.haver;
     saldos[m.codi].saldo += m.deure - m.haver;
-    if (m.codi.startsWith("7")) r_ing += m.haver - m.deure;
-    if (m.codi.startsWith("6")) r_des += m.deure - m.haver;
+
+    if (String(m.codi).startsWith("7")) r_ing += m.haver - m.deure;
+    if (String(m.codi).startsWith("6")) r_des += m.deure - m.haver;
   });
 
   const resExercici = r_ing - r_des;
   let totalActiuGlobal = 0;
   let totalPassiuGlobal = 0;
 
+  // RENDERITZADOR DE BALANÇ (ACTIU / PASSIU)
   const renderTaulaPGC = (bloc, esPassiu = false) => {
     return bloc
       .map((seccio) => {
@@ -1361,50 +1549,44 @@ function mostrarInformesFinancers() {
             let comptesHTML = "";
 
             if (s.esResultat) {
-              // El resultat de l'exercici a l'Excel de P&G ja ve amb el seu signe
               saldoSub = resExercici;
               comptesHTML = `
-          <div class="flex justify-between items-center pl-8 py-1 text-[10px] text-slate-400 italic">
-            <span>(Càlcul P&G)</span>
-            <span class="w-32 text-right">${formatSAP(resExercici)}</span>
-          </div>`;
+            <div class="flex justify-between items-center pl-8 py-1 text-[10px] text-slate-400 italic">
+              <span>(Càlcul P&G)</span>
+              <span class="w-32 text-right">${formatSAP(resExercici)}</span>
+            </div>`;
             } else {
               const codis = Object.keys(saldos).filter((c) => s.regex.test(c));
-
-              // Sumem el saldo net (Deure - Haver)
               const saldoNetGrup = codis.reduce(
                 (acc, c) => acc + saldos[c].saldo,
                 0,
               );
-
-              // Lògica de signe: A l'actiu volem D-H, al passiu volem H-D
               saldoSub = esPassiu ? -saldoNetGrup : saldoNetGrup;
 
               comptesHTML = codis
                 .map((c) => {
-                  // El saldo individual també ha de seguir la lògica de la seva banda
                   const saldoIndividual = esPassiu
                     ? -saldos[c].saldo
                     : saldos[c].saldo;
+                  // CORRECCIÓ: Fem servir veureDetallCompte
                   return `
-            <div onclick="obrirDrillDown('${c}')" class="flex justify-between items-center pl-8 py-1 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 group">
-              <span class="text-[11px] text-slate-600 group-hover:text-indigo-700"><b>${c}</b> ${saldos[c].nom}</span>
-              <span class="w-32 text-right font-mono text-[11px] text-slate-500">${formatSAP(saldoIndividual)}</span>
-            </div>`;
+              <div onclick="veureDetallCompte('${c}')" class="flex justify-between items-center pl-8 py-1 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 group">
+                <span class="text-[11px] text-slate-600 group-hover:text-indigo-700"><b>${c}</b> ${saldos[c].nom}</span>
+                <span class="w-32 text-right font-mono text-[11px] text-slate-500">${formatSAP(saldoIndividual)}</span>
+              </div>`;
                 })
                 .join("");
             }
 
             sumaSeccio += saldoSub;
-
             return `
-        <div class="border-b border-slate-100 last:border-0">
-          <div class="flex justify-between items-center px-4 py-2 bg-slate-50/30">
-            <span class="text-[10px] font-bold text-slate-700 uppercase">${s.titol}</span>
-            <span class="w-32 text-right font-mono text-[11px] font-bold">${formatSAP(saldoSub)}</span>
-          </div>
-          ${comptesHTML}
-        </div>`;
+          <div class="border-b border-slate-100 last:border-0">
+            <div class="flex justify-between items-center px-4 py-2 bg-slate-50/30">
+              <span class="text-[10px] font-bold text-slate-700 uppercase">${s.titol}</span>
+              <span class="w-32 text-right font-mono text-[11px] font-bold">${formatSAP(saldoSub)}</span>
+            </div>
+            ${comptesHTML}
+          </div>`;
           })
           .join("");
 
@@ -1412,13 +1594,13 @@ function mostrarInformesFinancers() {
         else totalActiuGlobal += sumaSeccio;
 
         return `
-      <div class="mb-4 bg-white border-x border-slate-200">
-        <div class="bg-slate-200/50 px-4 py-1.5 border-y border-slate-200 flex justify-between items-center">
-          <h4 class="text-[10px] font-black text-slate-900 tracking-wider">${seccio.titol}</h4>
-          <span class="w-32 text-right font-mono text-[11px] font-black">${formatSAP(sumaSeccio)}</span>
-        </div>
-        ${htmlSub}
-      </div>`;
+        <div class="mb-4 bg-white border-x border-slate-200">
+          <div class="bg-slate-200/50 px-4 py-1.5 border-y border-slate-200 flex justify-between items-center uppercase font-black text-[10px] tracking-widest text-slate-900">
+            <span>${seccio.titol}</span>
+            <span class="w-32 text-right font-mono">${formatSAP(sumaSeccio)}</span>
+          </div>
+          ${htmlSub}
+        </div>`;
       })
       .join("");
   };
@@ -1432,7 +1614,6 @@ function mostrarInformesFinancers() {
           <p class="text-xs text-slate-500 font-bold uppercase tracking-widest">Tema: ${estat.temaActiu} | Exercici 202X</p>
         </div>
         <div class="no-print bg-slate-100 p-3 rounded flex items-center gap-3">
-          <span class="text-[10px] font-bold uppercase text-slate-400">Canviar Tema:</span>
           <select onchange="estat.temaActiu=this.value; mostrarInformesFinancers();" class="text-xs font-bold bg-transparent border-none">
             ${llistaTemes.map((t) => `<option value="${t}" ${t === estat.temaActiu ? "selected" : ""}>${t}</option>`).join("")}
           </select>
@@ -1450,7 +1631,7 @@ function mostrarInformesFinancers() {
         </div>
 
         <div class="flex flex-col">
-          <div class="bg-slate-800 text-white p-2 text-center text-xs font-bold uppercase tracking-widest">Patrimoni Net i Passiu (Finançament)</div>
+          <div class="bg-slate-800 text-white p-2 text-center text-xs font-bold uppercase tracking-widest">Patrimoni Net i Passiu</div>
           ${renderTaulaPGC(ESTRUCTURA_PGC_FINAL.passiu, true)}
           <div class="bg-slate-800 text-white p-4 flex justify-between items-center mt-auto border-t border-slate-600">
             <span class="text-xs font-black uppercase">TOTAL PATRIMONI I PASSIU</span>
@@ -1459,114 +1640,210 @@ function mostrarInformesFinancers() {
         </div>
       </div>
 
-      <div class="mt-12 border border-slate-300">
-        <div class="bg-indigo-900 text-white p-2 text-center text-xs font-bold uppercase tracking-widest italic">Compte de Pèrdues i Guanys (Abreviada)</div>
-        <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div>
-             <h5 class="text-[10px] font-black text-rose-600 border-b border-rose-100 mb-2 uppercase italic">Deure (Despeses)</h5>
-             ${
-               Object.keys(saldos)
-                 .filter((c) => c.startsWith("6"))
-                 .map(
-                   (c) => `
-               <div class="flex justify-between text-[11px] py-1">
-                 <span>${c} ${saldos[c].nom}</span>
-                 <span class="font-mono">${formatSAP(saldos[c].saldo)}</span>
-               </div>
-             `,
-                 )
-                 .join("") ||
-               '<p class="text-slate-300 italic text-[10px]">Sense despeses</p>'
-             }
-           </div>
-           <div>
-             <h5 class="text-[10px] font-black text-emerald-600 border-b border-emerald-100 mb-2 uppercase italic">Haver (Ingressos)</h5>
-             ${
-               Object.keys(saldos)
-                 .filter((c) => c.startsWith("7"))
-                 .map(
-                   (c) => `
-               <div class="flex justify-between text-[11px] py-1">
-                 <span>${c} ${saldos[c].nom}</span>
-                 <span class="font-mono">${formatSAP(Math.abs(saldos[c].saldo))}</span>
-               </div>
-             `,
-                 )
-                 .join("") ||
-               '<p class="text-slate-300 italic text-[10px]">Sense ingressos</p>'
-             }
-           </div>
+      <div class="mt-12 border border-slate-300 bg-white">
+        <div class="bg-indigo-900 text-white p-2 text-center text-xs font-bold uppercase tracking-widest italic">
+          Compte de Pèrdues i Guanys (Estructura PGC)
         </div>
-        <div class="bg-slate-100 p-4 border-t border-slate-300 flex justify-between items-center">
-          <span class="text-xs font-black uppercase">RESULTAT DE L'EXERCICI (A-B)</span>
-          <span class="font-mono text-xl font-black ${resExercici >= 0 ? "text-emerald-700" : "text-rose-700"}">${formatSAP(resExercici)}</span>
+        
+        <div class="p-0">
+          ${(() => {
+            let acumExplotacio = 0;
+            let acumFinancer = 0;
+
+            return ESTRUCTURA_PYG_PGC.map((e) => {
+              if (e.esSubtotal) {
+                let valor = 0;
+                let classeFons =
+                  "bg-slate-100 font-bold border-y border-slate-200";
+                if (e.esSubtotal === "explotacio") valor = acumExplotacio;
+                if (e.esSubtotal === "financer") valor = acumFinancer;
+                if (e.esSubtotal === "ebt")
+                  valor = acumExplotacio + acumFinancer;
+                if (e.esSubtotal === "final") {
+                  valor = resExercici;
+                  classeFons = "bg-indigo-900 text-white font-black text-sm";
+                }
+                return `
+                  <div class="flex justify-between px-4 py-3 ${classeFons} text-[10px] uppercase">
+                    <span>${e.titol}</span>
+                    <span class="font-mono">${formatSAP(valor)}</span>
+                  </div>`;
+              }
+
+              const codisEpigraf = Object.keys(saldos).filter((c) =>
+                e.regex.test(c),
+              );
+              let sumaEpigraf = 0;
+
+              const htmlComptes = codisEpigraf
+                .map((c) => {
+                  const s = saldos[c];
+                  const saldoNet = c.startsWith("7")
+                    ? s.haver - s.deure
+                    : s.deure - s.haver;
+                  const impacte = c.startsWith("7") ? saldoNet : -saldoNet;
+                  sumaEpigraf += impacte;
+
+                  if (e.titol.match(/^[1-6]/)) acumExplotacio += impacte;
+                  if (e.titol.match(/^[7-8]/)) acumFinancer += impacte;
+
+                  // CORRECCIÓ: Fem servir veureDetallCompte
+                  return `
+                  <div onclick="veureDetallCompte('${c}')" class="flex justify-between pl-10 pr-4 py-1 text-[10px] text-slate-500 italic border-b border-slate-50 hover:bg-indigo-50 cursor-pointer group">
+                    <span class="group-hover:text-indigo-700"><b>${c}</b> ${s.nom}</span>
+                    <span class="font-mono">${formatSAP(saldoNet)}</span>
+                  </div>`;
+                })
+                .join("");
+
+              if (codisEpigraf.length === 0) return "";
+
+              return `
+                <div>
+                  <div class="flex justify-between px-4 py-2 text-[10px] font-bold text-slate-700 bg-slate-50/50 border-b border-slate-100">
+                    <span>${e.titol}</span>
+                    <span class="font-mono">${formatSAP(sumaEpigraf)}</span>
+                  </div>
+                  ${htmlComptes}
+                </div>`;
+            }).join("");
+          })()}
         </div>
       </div>
     </div>
-    <div id="modal-audit" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[500] flex items-center justify-center p-4"></div>
+    <div id="modal-drilldown" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[500] flex items-center justify-center p-4"></div>
   `;
 }
 // B. Generació del Balanç i P&G (Visió SAP)
 // Aquesta funció agrupa els moviments i els presenta com un informe oficial.
 function veureDetallCompte(codi) {
-  // Filtrem els moviments del tema actual per a aquest compte específic
   const moviments = obtenirMovimentsDetallatsTema().filter(
     (m) => String(m.codi) === String(codi),
   );
   const modal = document.getElementById("modal-drilldown");
   if (!modal) return;
 
+  // --- CONFIGURACIÓ DE SIGNES ---
+  // Afegeix aquí els prefixos segons el comportament que vulguis:
+
+  const regles = {
+    // Sumen per l'HAVER (H-D): Ingressos, Deutes, Devolucions de compra
+    positiusHaver: [
+      "7",
+      "1",
+      "40",
+      "41",
+      "475",
+      "477",
+      "52",
+      "17",
+      "606",
+      "608",
+      "609",
+    ],
+
+    // Sumen pel DEURE (D-H): Actius, Despeses, Devolucions de venda
+    positiusDeure: [
+      "2",
+      "3",
+      "43",
+      "472",
+      "57",
+      "600",
+      "601",
+      "602",
+      "607",
+      "62",
+      "708",
+      "709",
+    ],
+  };
+
+  // Funció interna per decidir el signe
+  const decidirSigne = (c) => {
+    const codiStr = String(c);
+    // 1. Prioritat: Si està a la llista d'Haver (com la 608 que és "excepció" del grup 6)
+    if (regles.positiusHaver.some((p) => codiStr.startsWith(p))) return "H-D";
+    // 2. Si està a la llista de Deure
+    if (regles.positiusDeure.some((p) => codiStr.startsWith(p))) return "D-H";
+    // 3. Per defecte (casos no definits), mirem el primer número
+    return codiStr.startsWith("6") ||
+      codiStr.startsWith("2") ||
+      codiStr.startsWith("43")
+      ? "D-H"
+      : "H-D";
+  };
+
+  const modeSigne = decidirSigne(codi);
   let saldoAcu = 0;
+
   const files = moviments
     .map((m) => {
-      saldoAcu += m.deure - m.haver;
+      // Apliquem la lògica segons el mode decidit
+      const impacte =
+        modeSigne === "H-D" ? m.haver - m.deure : m.deure - m.haver;
+
+      // AJUST ESPECÍFIC P&G: Si és una despesa pura (600, 62...) i volem que resti al drill-down
+      // Com que a la P&G vols veure la 600 com a "-2.600", forcem el signe negatiu aquí:
+      let impacteVisual = impacte;
+      if (
+        codi.startsWith("6") &&
+        !["606", "608", "609"].some((p) => codi.startsWith(p))
+      ) {
+        impacteVisual = impacte * -1;
+      }
+
+      saldoAcu += impacteVisual;
+
       return `
-      <tr class="text-[10px] border-b border-slate-100 hover:bg-slate-50 transition">
-        <td class="p-3 text-slate-400 font-bold">#${m.id}</td>
-        <td class="p-3 text-slate-600 font-medium max-w-xs truncate">${m.concepte}</td>
-        <td class="p-3 text-right font-mono text-emerald-600">${m.deure > 0 ? m.deure.toFixed(2) : "-"}</td>
-        <td class="p-3 text-right font-mono text-rose-600">${m.haver > 0 ? m.haver.toFixed(2) : "-"}</td>
-        <td class="p-3 text-right font-mono font-black text-slate-800">${saldoAcu.toFixed(2)}€</td>
+      <tr class="text-[11px] border-b border-slate-100 hover:bg-slate-50 transition">
+        <td class="p-3 text-slate-400 font-mono italic">#${m.id}</td>
+        <td class="p-3 text-slate-700 font-medium">${m.concepte || "Apunt"}</td>
+        <td class="p-3 text-right font-mono text-emerald-600">${m.deure > 0 ? formatSAP(m.deure) : "-"}</td>
+        <td class="p-3 text-right font-mono text-rose-600">${m.haver > 0 ? formatSAP(m.haver) : "-"}</td>
+        <td class="p-3 text-right font-mono font-bold ${saldoAcu >= 0 ? "text-slate-900" : "text-rose-600"}">
+          ${formatSAP(saldoAcu)}
+        </td>
       </tr>`;
     })
     .join("");
 
+  // Estructura visual del Modal (HTML)
   modal.innerHTML = `
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200">
-      <div class="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-center">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-300">
+      <div class="bg-slate-800 p-4 flex justify-between items-center text-white">
         <div>
-          <h4 class="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Detall del Major (Drill-down)</h4>
-          <h3 class="text-lg font-black text-slate-800 tracking-tighter uppercase italic">${codi} - ${cercarNomCompte(codi)}</h3>
+          <h3 class="text-lg font-bold">${codi} - ${cercarNomCompte(codi)}</h3>
+          <p class="text-[9px] text-slate-400 uppercase tracking-widest">
+            Mode: ${codi.startsWith("6") ? "Impacte en P&G (Negatiu = Despesa)" : "Saldo Acumulat"}
+          </p>
         </div>
-        <button onclick="document.getElementById('modal-drilldown').classList.add('hidden')" class="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-100 transition shadow-sm">✕</button>
+        <button onclick="document.getElementById('modal-drilldown').classList.add('hidden')" class="w-8 h-8 rounded-full bg-slate-700 hover:bg-rose-600 transition">✕</button>
       </div>
-      <div class="max-h-[60vh] overflow-y-auto">
-        <table class="w-full text-left border-collapse">
-          <thead class="sticky top-0 bg-white shadow-sm z-10">
-            <tr class="text-[9px] uppercase text-slate-400 font-black border-b border-slate-200">
+      <div class="max-h-[50vh] overflow-y-auto">
+        <table class="w-full text-left">
+          <thead class="sticky top-0 bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b">
+            <tr>
               <th class="p-3">Ref</th>
-              <th class="p-3">Concepte de l'apunt</th>
-              <th class="p-3 text-right">Deure</th>
-              <th class="p-3 text-right">Haver</th>
-              <th class="p-3 text-right">Saldo Progressiu</th>
+              <th class="p-3">Concepte</th>
+              <th class="p-3 text-right text-emerald-700">Deure</th>
+              <th class="p-3 text-right text-rose-700">Haver</th>
+              <th class="p-3 text-right bg-slate-100/50">Saldo</th>
             </tr>
           </thead>
-          <tbody>
-            ${files || '<tr><td colspan="5" class="p-10 text-center text-slate-400 italic">No hi ha moviments per a aquest compte.</td></tr>'}
-          </tbody>
+          <tbody>${files}</tbody>
         </table>
       </div>
-      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
-         <div class="flex flex-col items-end">
-            <span class="text-[9px] font-black text-slate-400 uppercase">Saldo Final</span>
-            <span class="text-lg font-black text-slate-900">${saldoAcu.toFixed(2)}€</span>
-         </div>
+      <div class="p-4 bg-slate-100 border-t flex justify-between items-center">
+        <span class="text-[10px] text-slate-500 italic">El signe reflecteix el comportament en l'informe financer.</span>
+        <div class="text-right">
+          <div class="text-[10px] font-bold text-slate-400 uppercase">Saldo Final</div>
+          <div class="text-xl font-black ${saldoAcu >= 0 ? "text-slate-900" : "text-rose-600"}">${formatSAP(saldoAcu)}</div>
+        </div>
       </div>
-    </div>  
-  `;
+    </div>`;
   modal.classList.remove("hidden");
 }
-
 window.obrirDrillDown = function (codi) {
   const moviments = obtenirMovimentsDetallatsTema();
   const movsCompte = moviments.filter((m) => m.codi === codi);
@@ -1674,6 +1951,56 @@ function toggleSidebar() {
   const sidebar = document.getElementById("sidebar");
   // Simplement afegim o treiem la classe que amaga l'aside
   sidebar.classList.toggle("-translate-x-full");
+}
+
+// Gestió de la tecla Intro per navegar com un professional
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Enter") {
+    const activeEl = document.activeElement;
+
+    // Si estem dins d'un input de la taula de diari
+    if (
+      activeEl.classList.contains("select-compte") ||
+      activeEl.classList.contains("input-deure") ||
+      activeEl.classList.contains("input-haver")
+    ) {
+      e.preventDefault(); // Evitem que l'Intro faci coses rares
+      const fila = activeEl.closest("tr");
+
+      // 1. Si estem al CODI
+      if (activeEl.classList.contains("select-compte")) {
+        // Anem al DEURE
+        fila.querySelector(".input-deure").focus();
+      }
+
+      // 2. Si estem al DEURE
+      else if (activeEl.classList.contains("input-deure")) {
+        if (activeEl.value === "" || parseFloat(activeEl.value) === 0) {
+          // Si està buit, anem al HAVER de la mateixa fila
+          fila.querySelector(".input-haver").focus();
+        } else {
+          // Si té dades, anem a una NOVA FILA (Codi)
+          accionsTeclatNovaFila();
+        }
+      }
+
+      // 3. Si estem al HAVER
+      else if (activeEl.classList.contains("input-haver")) {
+        // Anem a una NOVA FILA (Codi)
+        accionsTeclatNovaFila();
+      }
+    }
+  }
+});
+
+function accionsTeclatNovaFila() {
+  afegirFila(); // Cridem la teva funció existent
+  // Esperem un mil·lisegon que el DOM es refresqui i anem a l'última fila creada
+  setTimeout(() => {
+    const files = document.querySelectorAll("#diari-body tr");
+    const ultimaFila = files[files.length - 1];
+    if (ultimaFila) ultimaFila.querySelector(".select-compte").focus();
+  }, 10);
 }
 
 function logout() {

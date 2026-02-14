@@ -124,3 +124,44 @@ aside nav::-webkit-scrollbar-thumb {
   background: #4f46e5;
   border-radius: 10px;
 }
+
+/* Taula més gran i clara */
+#diari-body input,
+#diari-body select {
+  font-size: 1.1rem !important; /* Lletra més gran */
+  font-weight: 500;
+  padding: 8px !important;
+}
+
+/* Totals ben destacats */
+#total-deure,
+#total-haver {
+  font-size: 1.3rem !important;
+  font-weight: 900 !important;
+  color: #1e293b;
+  letter-spacing: -0.5px;
+}
+
+/* Formatat de moneda per als labels de sota */
+.format-moneda {
+  font-family: "JetBrains Mono", monospace; /* Si en tens una de monoespai */
+}
+
+/* Millora la visualització dels camps de text i llistes */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+#diari-body input:focus {
+  background-color: white !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.nom-compte {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
