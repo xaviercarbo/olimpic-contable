@@ -56,117 +56,91 @@
       </div>
     </div>
 
-    <div
-      id="modal-login"
-      class="fixed inset-0 z-[200] bg-slate-900 flex items-center justify-center p-4 overflow-y-auto"
-    >
-      <div
-        class="bg-white rounded-[3rem] shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col md:flex-row min-h-[500px]"
-      >
-        <div
-          class="md:w-1/2 bg-indigo-600 p-12 text-white flex flex-col justify-center relative overflow-hidden"
-        >
-          <div
-            class="absolute top-0 right-0 p-8 opacity-10 text-9xl font-black italic"
-          >
-            PGC
-          </div>
-          <div class="relative z-10">
-            <div
-              class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center font-black text-3xl italic mb-6 shadow-xl backdrop-blur-sm"
-            >
-              OC
-            </div>
-            <h1 class="text-4xl font-black uppercase italic leading-tight mb-4">
-              Benvingut a l'Olimpíada <br /><span class="text-indigo-200"
-                >Comptable 2026</span
-              >
-            </h1>
-            <p class="text-indigo-100 text-sm leading-relaxed mb-8 font-medium">
-              Accedeix a la plataforma oficial per resoldre casos pràctics del
-              Pla General Comptable i assolir el rang d'excel·lència acadèmica
-              A+.
-            </p>
-            <div class="flex gap-4 items-center">
-              <div class="h-[1px] flex-1 bg-indigo-400"></div>
-              <span
-                class="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-300"
-                >Certamen d'Autovaluació</span
-              >
-              <div class="h-[1px] flex-1 bg-indigo-400"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="md:w-1/2 p-12 flex flex-col justify-center bg-white">
-          <div class="flex items-center gap-8 mb-10 border-b border-slate-100">
-            <button
-              onclick="canviarTab('login')"
-              id="tab-login"
-              class="font-black text-xs uppercase tracking-widest text-indigo-600 border-b-2 border-indigo-600 pb-4 flex-shrink-0 transition-all"
-            >
-              Entrar
-            </button>
-            <button
-              onclick="canviarTab('registre')"
-              id="tab-registre"
-              class="font-black text-xs uppercase tracking-widest text-slate-400 border-b-2 border-transparent pb-4 flex-shrink-0 transition-all"
-            >
-              Nou Usuari
-            </button>
-          </div>
-
-          <div id="form-usuari" class="space-y-6">
-            <div class="group">
-              <label
-                class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block group-focus-within:text-indigo-600 transition-colors"
-                >Nom d'usuari</label
-              >
-              <input
-                type="text"
-                id="nom-input"
-                placeholder="Escriu el teu usuari"
-                class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-              />
-            </div>
-            <div id="contenedor-grup" class="hidden mt-4">
-              <label
-                class="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2"
-              >
-                Assignar Grup
-              </label>
-              <select
-                id="grup-input"
-                class="w-full mt-1 p-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 outline-none text-xs font-bold transition"
-              >
-                <option value="Grup A">Grup A 🍎</option>
-                <option value="Grup B">Grup B 🍏</option>
-              </select>
-            </div>
-
-            <div>
-              <label
-                class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block"
-                >Contrasenya</label
-              >
-              <input
-                type="password"
-                id="pass-input"
-                placeholder="••••••••"
-                class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-              />
-            </div>
-            <button
-              onclick="executarAccio()"
-              id="btn-principal"
-              class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs hover:bg-indigo-600 transition-all shadow-xl active:scale-[0.98]"
-            >
-              Validar i Accedir
-            </button>
-          </div>
+<div id="modal-login" class="fixed inset-0 z-[200] bg-slate-900 flex items-center justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-[3rem] shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col md:flex-row min-h-[500px]">
+    
+    <div class="md:w-1/2 bg-indigo-600 p-12 text-white flex flex-col justify-center relative overflow-hidden">
+      <div class="absolute top-0 right-0 p-8 opacity-10 text-9xl font-black italic">PGC</div>
+      <div class="relative z-10">
+        <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center font-black text-3xl italic mb-6 shadow-xl backdrop-blur-sm">OC</div>
+        <h1 class="text-4xl font-black uppercase italic leading-tight mb-4">
+          Benvingut a l'Olimpíada <br /><span class="text-indigo-200">Comptable 2026</span>
+        </h1>
+        <p class="text-indigo-100 text-sm leading-relaxed mb-8 font-medium">
+          Accedeix a la plataforma oficial per resoldre casos pràctics del Pla General Comptable...
+        </p>
+        <div class="flex gap-4 items-center">
+          <div class="h-[1px] flex-1 bg-indigo-400"></div>
+          <span class="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-300">Certamen d'Autovaluació</span>
+          <div class="h-[1px] flex-1 bg-indigo-400"></div>
         </div>
       </div>
     </div>
+
+    <div class="md:w-1/2 p-12 flex flex-col justify-center bg-white">
+      
+      <div id="tabs-contenidor" class="flex items-center gap-8 mb-10 border-b border-slate-100">
+        <button onclick="canviarTab('login')" id="tab-login" class="font-black text-xs uppercase tracking-widest text-indigo-600 border-b-2 border-indigo-600 pb-4 transition-all">Entrar</button>
+        <button onclick="canviarTab('registre')" id="tab-registre" class="font-black text-xs uppercase tracking-widest text-slate-400 border-b-2 border-transparent pb-4 transition-all">Nou Usuari</button>
+      </div>
+
+      <div id="form-usuari" class="space-y-5">
+        <div class="group">
+          <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block group-focus-within:text-indigo-600 transition-colors">Nom d'usuari</label>
+          <input type="text" id="nom-input" placeholder="Escriu el teu usuari" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
+        </div>
+
+        <div id="contenedor-email" class="hidden group">
+          <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block group-focus-within:text-indigo-600 transition-colors">Correu Electrònic (per recuperar accés)</label>
+          <input type="email" id="email-input" placeholder="el-teu@correu.com" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
+        </div>
+
+        <div id="contenedor-grup" class="hidden">
+          <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Assignar Grup</label>
+          <select id="grup-input" class="w-full mt-1 p-3 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 outline-none text-xs font-bold transition">
+            <option value="Grup A">Grup A 🍎</option>
+            <option value="Grup B">Grup B 🍏</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block">Contrasenya</label>
+          <input type="password" id="pass-input" placeholder="••••••••" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
+          
+          <div id="link-recuperar" class="text-right mt-2">
+            <button onclick="obrirPantallaRecuperacio()" class="text-[10px] font-bold text-indigo-500 hover:underline uppercase tracking-tighter">He oblidat la contrasenya</button>
+          </div>
+        </div>
+
+        <button onclick="executarAccio()" id="btn-principal" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs hover:bg-indigo-600 transition-all shadow-xl active:scale-[0.98]">
+          Validar i Accedir
+        </button>
+      </div>
+
+      <div id="form-recuperar" class="hidden space-y-6 animate-in fade-in duration-500">
+        <div class="mb-4">
+          <h3 class="text-xl font-black text-slate-800 uppercase italic">Recuperar Accés</h3>
+          <p class="text-xs text-slate-400 font-medium">T'enviarem un codi de verificació al teu email.</p>
+        </div>
+
+        <div id="pas1-recuperar">
+          <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block">Escriu el teu Email de registre</label>
+          <input type="email" id="recuperar-email-input" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button onclick="solicitarCodiRecuperacio()" class="w-full mt-4 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Enviar Codi</button>
+        </div>
+
+        <div id="pas2-recuperar" class="hidden space-y-4">
+          <input type="text" id="recuperar-codi-input" placeholder="Codi de 6 dígits" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold text-center text-xl tracking-[0.5em]" />
+          <input type="password" id="recuperar-nova-pass" placeholder="Nova Contrasenya" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold" />
+          <button onclick="executarCanviContrasenya()" class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Actualitzar Contrasenya</button>
+        </div>
+
+        <button onclick="tornarAlLoginDesDeRecuperar()" class="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition">Tornar enrere</button>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <div class="flex h-screen overflow-hidden">
   

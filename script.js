@@ -14,7 +14,7 @@ let estat = {
 let ivaSeleccionat = 0.21;
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbznyEGtz-xHLPvzZFsSTbbtDe7c1avQvd2NoMmkc_D70JjSKvJkIyuWqSdt1KYReQyC/exec"; // <--- ENGANXA LA URL AQUÍ
+  "https://script.google.com/macros/s/AKfycbxL5vpQXpjkrBp6w8X93F_oueAQEdRifLxLl05BBz2l9qPq1zlFULbUP_7W-VzG_cF6/exec"; // <--- ENGANXA LA URL AQUÍ
 let modoActual = "login";
 
 // Aquest objecte contindrà tots els epígrafs dels teus PDFs
@@ -127,34 +127,136 @@ function formatarNumeroEuropeu(numero) {
 }
 
 // Canviar entre pestanyes de Login i Registre
-function canviarTab(modo) {
-  modoActual = modo;
-  const btn = document.getElementById("btn-principal");
+function canviarTab(tab) {
+  modoActual = tab;
   const tLogin = document.getElementById("tab-login");
-  const tRegistre = document.getElementById("tab-registre");
-  const contenedorGrup = document.getElementById("contenedor-grup"); // Nova línia
+  const tReg = document.getElementById("tab-registre");
+  const cGrup = document.getElementById("contenedor-grup");
+  const cEmail = document.getElementById("contenedor-email"); // NOU
+  const lRec = document.getElementById("link-recuperar"); // NOU
 
-  if (modo === "login") {
-    btn.innerText = "Entrar a l'Olimpíada";
-    tLogin.classList.replace("text-slate-400", "text-indigo-600");
-    tRegistre.classList.replace("text-indigo-600", "text-slate-400");
-    if (contenedorGrup) contenedorGrup.classList.add("hidden"); // Amagar si és login
+  if (tab === "login") {
+    tLogin.className =
+      "font-black text-xs uppercase tracking-widest text-indigo-600 border-b-2 border-indigo-600 pb-4 transition-all";
+    tReg.className =
+      "font-black text-xs uppercase tracking-widest text-slate-400 border-b-2 border-transparent pb-4 transition-all";
+    cGrup.classList.add("hidden");
+    cEmail.classList.add("hidden"); // Amaguem email
+    lRec.classList.remove("hidden"); // Mostrem "oblidat"
   } else {
-    btn.innerText = "Crear compte nou";
-    tRegistre.classList.replace("text-slate-400", "text-indigo-600");
-    tLogin.classList.replace("text-indigo-600", "text-slate-400");
-    if (contenedorGrup) contenedorGrup.classList.remove("hidden"); // Mostrar si és registre
+    tReg.className =
+      "font-black text-xs uppercase tracking-widest text-indigo-600 border-b-2 border-indigo-600 pb-4 transition-all";
+    tLogin.className =
+      "font-black text-xs uppercase tracking-widest text-slate-400 border-b-2 border-transparent pb-4 transition-all";
+    cGrup.classList.remove("hidden");
+    cEmail.classList.remove("hidden"); // Mostrem email
+    lRec.classList.add("hidden"); // Amaguem "oblidat"
   }
 }
+
+// funcions de navegació de recuperació:
+function obrirPantallaRecuperacio() {
+  document.getElementById("tabs-contenidor").classList.add("hidden");
+  document.getElementById("form-usuari").classList.add("hidden");
+  document.getElementById("form-recuperar").classList.remove("hidden");
+}
+
+// PAS 1: Enviar email per rebre codi
+async function solicitarCodiRecuperacio() {
+  const email = document.getElementById("recuperar-email-input").value.trim();
+  if (!email) return alert("Escriu el teu correu electrònic.");
+
+  const btn = document.querySelector("#pas1-recuperar button");
+  btn.disabled = true;
+  btn.innerText = "Enviant...";
+
+  try {
+    // Intentem la petició. Si falla per CORS, Google sovint ha executat igualment el script
+    await fetch(API_URL, {
+      method: "POST",
+      mode: "no-cors", // <--- Això evita l'error de bloqueig, però no ens deixa llegir la resposta
+      body: JSON.stringify({ action: "solicitarCodi", email: email }),
+    });
+
+    // Com que no podem llegir la resposta amb no-cors, avisem l'usuari
+    // i passem al següent pas directament.
+    alert(
+      "📧 S'ha enviat una petició. Si l'email existeix, rebràs el codi en breu.",
+    );
+    document.getElementById("pas1-recuperar").classList.add("hidden");
+    document.getElementById("pas2-recuperar").classList.remove("hidden");
+  } catch (e) {
+    console.error("Error:", e);
+    alert("Hi ha hagut un problema amb la connexió.");
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "Enviar Codi";
+  }
+}
+
+// PAS 2: Validar codi i canviar pass
+async function executarCanviContrasenya() {
+  const email = document.getElementById("recuperar-email-input").value.trim();
+  const codi = document.getElementById("recuperar-codi-input").value.trim();
+  const novaPass = document.getElementById("recuperar-nova-pass").value.trim();
+
+  if (!codi || !novaPass) return alert("Omple tots els camps.");
+
+  try {
+    const resposta = await fetch(API_URL, {
+      method: "POST",
+      // Eliminem capçaleres manuals per deixar que el navegador decideixi
+      body: JSON.stringify({
+        action: "resetPass",
+        email: email,
+        codi: codi,
+        novaPass: novaPass,
+      }),
+    });
+
+    const dades = await resposta.json();
+
+    if (dades.success) {
+      alert(
+        "✅ Contrasenya actualitzada! Ja pots entrar amb la teva nova clau.",
+      );
+      tornarAlLoginDesDeRecuperar();
+    } else {
+      alert("❌ " + dades.message);
+    }
+  } catch (e) {
+    // Si l'error de CORS persisteix aquí, normalment és perquè la URL de l'API
+    // ha canviat o no s'ha publicat la "Nova Versió" al Google Script.
+    alert(
+      "Error de seguretat (CORS). Prova d'obrir l'app des d'un servidor (Live Server).",
+    );
+  }
+}
+function tornarAlLoginDesDeRecuperar() {
+  document.getElementById("tabs-contenidor").classList.remove("hidden");
+  document.getElementById("form-usuari").classList.remove("hidden");
+  document.getElementById("form-recuperar").classList.add("hidden");
+  document.getElementById("pas1-recuperar").classList.remove("hidden");
+  document.getElementById("pas2-recuperar").classList.add("hidden");
+}
+
 // Afegeix aquesta funció al teu script.js
 async function executarAccio() {
   const nom = document.getElementById("nom-input").value.trim();
   const pass = document.getElementById("pass-input").value.trim();
+  const email = document.getElementById("email-input").value.trim(); // NOU
   const grup = document.getElementById("grup-input")
     ? document.getElementById("grup-input").value
     : "";
 
   if (!nom || !pass) return alert("Si us plau, omple tots els camps");
+
+  // Validació extra per al registre
+  if (modoActual === "registre" && !email) {
+    return alert(
+      "L'email és necessari per poder recuperar la contrasenya en el futur.",
+    );
+  }
 
   const btn = document.getElementById("btn-principal");
   btn.disabled = true;
@@ -169,6 +271,7 @@ async function executarAccio() {
 
     if (modoActual === "registre") {
       dadesEnviament.grup = grup;
+      dadesEnviament.email = email; // NOU: S'envia a la columna C
     }
 
     const resposta = await fetch(API_URL, {
@@ -181,6 +284,8 @@ async function executarAccio() {
     if (dades.success) {
       if (modoActual === "registre") {
         alert("✨ Usuari creat amb èxit! Ja pots iniciar sessió.");
+        // Netegem el camp d'email per seguretat abans de tornar al login
+        document.getElementById("email-input").value = "";
         canviarTab("login");
       } else {
         iniciarApp(dades.usuari);
@@ -194,7 +299,7 @@ async function executarAccio() {
   } finally {
     btn.disabled = false;
     btn.innerText =
-      modoActual === "login" ? "Entrar a l'Olimpíada" : "Registrar-me";
+      modoActual === "login" ? "Validar i Accedir" : "Registrar-me";
   }
 }
 
