@@ -1142,9 +1142,10 @@ function mostrarProgres() {
   const filtreHeader = document.getElementById("filtre-header-container");
   if (!container) return;
 
-  // 1. Inyectem els botons al HEADER
+  // 1. Inyectem els botons de filtre al HEADER
   if (filtreHeader) {
     filtreHeader.innerHTML = `
+        <div class="flex gap-2">
             <button onclick="canviarFiltreProgres('tots')" 
                 class="px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-tighter transition-all ${filtreProgres === "tots" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}">
                 Tots
@@ -1153,20 +1154,32 @@ function mostrarProgres() {
                 class="px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-tighter transition-all ${filtreProgres === "pendents" ? "bg-white text-rose-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}">
                 Pendents
             </button>
-        `;
+        </div>
+    `;
   }
 
+  // Títols de la secció
   document.getElementById("info-pregunta").innerText = "El Meu Rendiment";
   document.getElementById("progres-tema").innerText =
     "Estadístiques Detallades";
 
+  // Obtenim llista de temes i IDs completats
   const temes = [...new Set(estat.preguntes.map((p) => p.tema))];
   const completadesIDs = estat.completats.map(String);
 
   container.innerHTML = temes
     .map((tema) => {
       const totesPreguntesTema = estat.preguntes.filter((p) => p.tema === tema);
-      const totalTema = totesPreguntesTema.length; // Total d'exercicis del tema
+      const totalTema = totesPreguntesTema.length;
+      const fetesTema = totesPreguntesTema.filter((p) =>
+        completadesIDs.includes(String(p.id)),
+      ).length;
+      const percentTema =
+        totalTema > 0 ? Math.round((fetesTema / totalTema) * 100) : 0;
+      const esComplet = fetesTema === totalTema && totalTema > 0;
+
+      // Filtre de visualització
+      if (filtreProgres === "pendents" && fetesTema === totalTema) return "";
 
       const preguntesPerMostrar =
         filtreProgres === "pendents"
@@ -1175,94 +1188,96 @@ function mostrarProgres() {
             )
           : totesPreguntesTema;
 
-      if (filtreProgres === "pendents" && preguntesPerMostrar.length === 0)
-        return "";
-
-      const fetesTema = totesPreguntesTema.filter((p) =>
-        completadesIDs.includes(String(p.id)),
-      ).length;
-
-      const percentTema =
-        totalTema > 0 ? Math.round((fetesTema / totalTema) * 100) : 0;
-
-      // MILLORA: Condició robusta per detectar si el tema està realment acabat
-      const esComplet = fetesTema === totalTema && totalTema > 0;
-
       return `
-        <div class="bg-white rounded-[2rem] border ${esComplet ? "border-emerald-500 bg-emerald-50/20" : "border-slate-100"} shadow-sm hover:shadow-md transition-all duration-500 overflow-hidden">
-            <details class="group" ${filtreProgres === "pendents" ? "open" : ""}>
-                <summary class="p-8 cursor-pointer list-none outline-none">
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <p class="flex items-center gap-2 text-[10px] font-black ${esComplet ? "text-emerald-600" : "text-slate-400"} uppercase tracking-widest mb-1">
-                                ${tema}
-                                ${esComplet ? '<span class="bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[8px]">FINALITZAT</span>' : ""}
-                            </p>
-                            <div class="flex items-center gap-3">
-                                <h3 class="text-3xl font-black ${esComplet ? "text-emerald-700" : "text-slate-900"}">${percentTema}%</h3>
-                                ${esComplet ? '<span class="text-2xl animate-bounce">🏆</span>' : ""}
-                            </div>
-                        </div>
-                        <div class="flex flex-col items-end gap-2">
-                            <span class="text-[10px] font-bold ${esComplet ? "text-emerald-700 bg-emerald-100" : "text-slate-500 bg-slate-50"} px-3 py-1 rounded-full border ${esComplet ? "border-emerald-200" : "border-slate-100"}">
-                                ${fetesTema} / ${totalTema} Exercicis
-                            </span>
-                            <span class="text-[9px] font-black text-indigo-500 uppercase tracking-tighter group-open:hidden italic">veure detalls ↓</span>
+        <div class="bg-white rounded-[2rem] border ${esComplet ? "border-emerald-500 bg-emerald-50/20" : "border-slate-100"} shadow-sm hover:shadow-md transition-all duration-500 overflow-hidden mb-4">
+            <div class="p-8">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <p class="flex items-center gap-2 text-[10px] font-black ${esComplet ? "text-emerald-600" : "text-slate-400"} uppercase tracking-widest mb-1">
+                            ${tema}
+                            ${esComplet ? '<span class="bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[8px]">FINALITZAT</span>' : ""}
+                        </p>
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-3xl font-black ${esComplet ? "text-emerald-700" : "text-slate-900"}">${percentTema}%</h3>
+                            ${esComplet ? '<span class="text-2xl animate-bounce">🏆</span>' : ""}
                         </div>
                     </div>
-                    <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                        <div class="h-full ${esComplet ? "bg-emerald-500" : "bg-indigo-500"} transition-all duration-1000" style="width: ${percentTema}%"></div>
+                    
+                    <div class="flex gap-2">
+                        ${
+                          fetesTema > 0
+                            ? `
+                          <button onclick="generarInformePDF('${tema}')" 
+                              class="flex items-center gap-2 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 text-slate-500 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all shadow-sm">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                              </svg>
+                              PDF
+                          </button>
+                        `
+                            : ""
+                        }
                     </div>
-                </summary>
+                </div>
 
-                <div class="px-8 pb-8 pt-2 border-t border-slate-50 bg-slate-50/30">
-                    <div class="space-y-2 mt-4">
+                <details class="group">
+                    <summary class="list-none outline-none">
+                        <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-2">
+                            <div class="h-full ${esComplet ? "bg-emerald-500" : "bg-indigo-500"} transition-all duration-1000" style="width: ${percentTema}%"></div>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px]">
+                             <span class="font-bold text-slate-500">${fetesTema} / ${totalTema} Exercicis</span>
+                             <span class="font-black text-indigo-500 uppercase cursor-pointer group-open:hidden tracking-tighter italic">Veure llista ↓</span>
+                        </div>
+                    </summary>
+
+                    <div class="space-y-2 mt-4 pt-4 border-t border-slate-50">
                         ${preguntesPerMostrar
                           .map((p) => {
                             const esFeta = completadesIDs.includes(
                               String(p.id),
                             );
-                            const indexReal =
-                              totesPreguntesTema.findIndex(
-                                (item) => item.id === p.id,
-                              ) + 1;
-                            const títolNetejat =
-                              p.titol ||
-                              (p.descripcio
-                                ? p.descripcio.substring(0, 45) + "..."
-                                : "Assentament " + p.id);
+
+                            // Busquem l'enunciat real del Google Sheet per ID
+                            const dadesOrig = estat.preguntes.find(
+                              (orig) => String(orig.id) === String(p.id),
+                            );
+                            const textLlista = dadesOrig
+                              ? dadesOrig.titol ||
+                                (dadesOrig.enunciat
+                                  ? dadesOrig.enunciat.substring(0, 60) + "..."
+                                  : "Assentament " + p.id)
+                              : "Assentament " + p.id;
 
                             return `
                             <div class="flex items-center justify-between p-3 rounded-2xl border transition-all 
-                                ${esFeta ? "bg-white border-emerald-100 shadow-sm" : "bg-white/50 border-slate-100 opacity-80"}">
+                                ${esFeta ? "bg-white border-emerald-100 shadow-sm" : "bg-white/50 border-slate-50 opacity-80"}">
                                 <div class="flex items-center gap-3">
                                     <div class="w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-bold
-                                        ${esFeta ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}">
-                                        ${esFeta ? "✓" : indexReal}
+                                        ${esFeta ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-400"}">
+                                        ${esFeta ? "✓" : p.id}
                                     </div>
                                     <div class="flex flex-col">
-                                        <p class="text-[11px] font-bold ${esFeta ? "text-slate-800" : "text-slate-500"}">${títolNetejat}</p>
-                                        <p class="text-[9px] font-medium uppercase tracking-tighter ${esFeta ? "text-emerald-500" : "text-slate-400"}">
-                                            ${esFeta ? "Completat" : "Pendent"}
-                                        </p>
+                                        <p class="text-[11px] font-bold ${esFeta ? "text-slate-800" : "text-slate-500"} leading-tight">${textLlista}</p>
+                                        <p class="text-[8px] uppercase font-black text-slate-400 tracking-tighter">ID: ${p.id}</p>
                                     </div>
                                 </div>
                                 ${
                                   !esFeta
                                     ? `
                                     <button onclick="seleccionarPreguntaDirecta('${p.id}')" 
-                                        class="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-600 hover:text-white transition-all">
-                                        Resoldre
+                                        class="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all">
+                                        Anar
                                     </button>
                                 `
-                                    : `<span class="text-[9px] font-black text-emerald-500 pr-2 italic">✓ EXCEL·LENT</span>`
+                                    : ""
                                 }
                             </div>`;
                           })
                           .join("")}
                     </div>
-                </div>
-            </details>
+                </details>
+            </div>
         </div>`;
     })
     .join("");
@@ -1412,63 +1427,84 @@ setInterval(() => {
 
 // ----- Mostrar Ranquing ---------------------
 
-function generarInformePDF() {
-  // 1. Filtrem les preguntes que realment estan completades al Sheets
-  const exercicisResolts = estat.preguntes.filter((p) =>
+function generarInformePDF(temaFiltrar = null) {
+  // 1. Filtrem segons si s'ha demanat un tema concret o tot
+  let exercicisResolts = estat.preguntes.filter((p) =>
     estat.completats.includes(String(p.id)),
   );
 
+  if (temaFiltrar) {
+    exercicisResolts = exercicisResolts.filter((p) => p.tema === temaFiltrar);
+  }
+
   if (exercicisResolts.length === 0) {
-    alert("Encara no tens cap exercici registrat al núvol!");
+    alert("No hi ha exercicis finalitzats per mostrar en aquest apartat.");
     return;
   }
 
   const finestra = window.open("", "_blank");
 
-  // (Estils CSS... pots mantenir els que ja tenies)
+  // CSS Millorat (Punt 3: Espais més compactes)
   const estils = `<style>
-    body { font-family: 'Helvetica', sans-serif; color: #334155; padding: 40px; }
-    .header { border-bottom: 4px solid #6366f1; padding-bottom: 20px; margin-bottom: 30px; }
-    .assentament { margin-bottom: 40px; page-break-inside: avoid; }
-    .enunciat { font-size: 13px; font-weight: bold; background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th { border: 1px solid #e2e8f0; background: #f1f5f9; padding: 10px; text-align: left; }
-    td { border: 1px solid #e2e8f0; padding: 10px; }
-    .num { text-align: right; font-weight: bold; }
+    body { font-family: 'Segoe UI', Helvetica, sans-serif; color: #1e293b; padding: 30px; line-height: 1.4; }
+    .header { border-bottom: 3px solid #6366f1; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .header h1 { margin: 0; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; }
+    .header p { margin: 0; font-size: 12px; color: #64748b; font-weight: bold; }
+    .assentament { margin-bottom: 25px; page-break-inside: avoid; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+    .enunciat { font-size: 12px; font-weight: bold; background: #f8fafc; padding: 12px; border-bottom: 1px solid #e2e8f0; color: #475569; }
+    table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+    th { background: #f1f5f9; padding: 8px 10px; text-align: left; text-transform: uppercase; font-size: 9px; color: #64748b; border-bottom: 1px solid #e2e8f0; }
+    td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; }
+    .num { text-align: right; font-family: 'Courier New', monospace; font-weight: bold; }
+    .codi-td { color: #6366f1; font-weight: bold; }
   </style>`;
 
-  let contingut = `<html><head>${estils}</head><body>
+  let titolDoc = temaFiltrar ? `Diari: ${temaFiltrar}` : "Llibre Diari Complet";
+
+  let contingut = `<html><head><title>${titolDoc}</title>${estils}</head><body>
     <div class="header">
-      <h1>Llibre Diari Oficial</h1>
-      <p>Alumne: ${estat.userActiu.nom} | Grup: ${estat.userActiu.grup}</p>
+      <div>
+        <h1>${titolDoc}</h1>
+        <p>Olimpíada Comptable 2026</p>
+      </div>
+      <div style="text-align: right">
+        <p>Alumne: ${estat.userActiu.nom}</p>
+        <p>Grup: ${estat.userActiu.grup}</p>
+      </div>
     </div>`;
 
-  // 2. Generem les taules basant-nos en la SOLUCIÓ VALIDADA
-  exercicisResolts.forEach((ex, index) => {
+  exercicisResolts.forEach((ex) => {
     contingut += `
       <div class="assentament">
-        <div class="enunciat">Exercici ${ex.id}: ${ex.enunciat}</div>
+        <div class="enunciat">Tema: ${ex.tema} | Exercici ${ex.id}: ${ex.enunciat}</div>
         <table>
           <thead>
             <tr>
-              <th width="15%">Codi PGC</th>
-              <th width="45%">Compte</th>
-              <th width="20%">Deure</th>
-              <th width="20%">Haver</th>
+              <th width="10%">Codi</th>
+              <th width="50%">Descripció del Compte (PGC)</th>
+              <th width="20%" style="text-align: right">Deure</th>
+              <th width="20%" style="text-align: right">Haver</th>
             </tr>
           </thead>
           <tbody>
             ${ex.solucio
-              .map(
-                (l) => `
-              <tr>
-                <td class="num">${l.codi}</td>
-                <td>${l.nom || "Compte oficial"}</td>
-                <td class="num">${l.deure > 0 ? l.deure.toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : "-"}</td>
-                <td class="num">${l.haver > 0 ? l.haver.toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : "-"}</td>
-              </tr>
-            `,
-              )
+              .map((l) => {
+                // PUNT 2: Busquem el nom real al PGC carregat del Sheets
+                const compteReal = estat.pgc.find(
+                  (p) => String(p.codi) === String(l.codi),
+                );
+                const nomAMostrar = compteReal
+                  ? compteReal.nom
+                  : "Compte no trobat al PGC";
+
+                return `
+                <tr>
+                  <td class="codi-td">${l.codi}</td>
+                  <td style="font-weight: 500;">${nomAMostrar}</td>
+                  <td class="num">${l.deure > 0 ? l.deure.toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : "-"}</td>
+                  <td class="num">${l.haver > 0 ? l.haver.toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : "-"}</td>
+                </tr>`;
+              })
               .join("")}
           </tbody>
         </table>
@@ -1481,6 +1517,37 @@ function generarInformePDF() {
   setTimeout(() => {
     finestra.print();
   }, 500);
+}
+
+function actualitzarSelectorTemesPDF() {
+  const select = document.getElementById("select-tema-pdf");
+  if (!select) return;
+
+  // 1. Obtenim quins exercicis estan completats (IDs)
+  // 2. Busquem a quins temes pertanyen aquests exercicis
+  const temesAmbFeina = estat.preguntes
+    .filter((p) => estat.completats.includes(String(p.id)))
+    .map((p) => p.tema);
+
+  // 3. Treiem duplicats per tenir una llista de temes únics
+  const temesUnics = [...new Set(temesAmbFeina)];
+
+  if (temesUnics.length === 0) {
+    select.innerHTML = `<option value="">Sense exercicis fets</option>`;
+    return;
+  }
+
+  // 4. Omplim el select
+  select.innerHTML = temesUnics
+    .map((t) => `<option value="${t}">${t}</option>`)
+    .join("");
+}
+
+// Funció pont per al botó
+function imprimirTemaSeleccionat() {
+  const tema = document.getElementById("select-tema-pdf").value;
+  if (!tema) return alert("Selecciona un tema de la llista.");
+  generarInformePDF(tema);
 }
 
 let calculadoraMode = "directe"; // o 'invers'
