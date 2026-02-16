@@ -14,7 +14,7 @@ let estat = {
 let ivaSeleccionat = 0.21;
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbxL5vpQXpjkrBp6w8X93F_oueAQEdRifLxLl05BBz2l9qPq1zlFULbUP_7W-VzG_cF6/exec"; // <--- ENGANXA LA URL AQUÍ
+  "https://script.google.com/macros/s/AKfycby0quB8-pxsfHLwLZfCuXwIMJjJeTrzjsYnUAlulj8axku8kDKe5NKYHqWCCZGl-fCG/exec"; // <--- ENGANXA LA URL AQUÍ
 let modoActual = "login";
 
 // Aquest objecte contindrà tots els epígrafs dels teus PDFs
@@ -132,8 +132,8 @@ function canviarTab(tab) {
   const tLogin = document.getElementById("tab-login");
   const tReg = document.getElementById("tab-registre");
   const cGrup = document.getElementById("contenedor-grup");
-  const cEmail = document.getElementById("contenedor-email"); // NOU
-  const lRec = document.getElementById("link-recuperar"); // NOU
+  const cEmail = document.getElementById("contenedor-email");
+  const lRec = document.getElementById("link-recuperar");
 
   if (tab === "login") {
     tLogin.className =
@@ -141,16 +141,16 @@ function canviarTab(tab) {
     tReg.className =
       "font-black text-xs uppercase tracking-widest text-slate-400 border-b-2 border-transparent pb-4 transition-all";
     cGrup.classList.add("hidden");
-    cEmail.classList.add("hidden"); // Amaguem email
-    lRec.classList.remove("hidden"); // Mostrem "oblidat"
+    cEmail.classList.add("hidden");
+    lRec.classList.remove("hidden");
   } else {
     tReg.className =
       "font-black text-xs uppercase tracking-widest text-indigo-600 border-b-2 border-indigo-600 pb-4 transition-all";
     tLogin.className =
       "font-black text-xs uppercase tracking-widest text-slate-400 border-b-2 border-transparent pb-4 transition-all";
     cGrup.classList.remove("hidden");
-    cEmail.classList.remove("hidden"); // Mostrem email
-    lRec.classList.add("hidden"); // Amaguem "oblidat"
+    cEmail.classList.remove("hidden");
+    lRec.classList.add("hidden");
   }
 }
 
@@ -161,77 +161,90 @@ function obrirPantallaRecuperacio() {
   document.getElementById("form-recuperar").classList.remove("hidden");
 }
 
-// PAS 1: Enviar email per rebre codi
-async function solicitarCodiRecuperacio() {
-  const email = document.getElementById("recuperar-email-input").value.trim();
-  if (!email) return alert("Escriu el teu correu electrònic.");
-
-  const btn = document.querySelector("#pas1-recuperar button");
-  btn.disabled = true;
-  btn.innerText = "Enviant...";
-
-  try {
-    // Intentem la petició. Si falla per CORS, Google sovint ha executat igualment el script
-    await fetch(API_URL, {
-      method: "POST",
-      mode: "no-cors", // <--- Això evita l'error de bloqueig, però no ens deixa llegir la resposta
-      body: JSON.stringify({ action: "solicitarCodi", email: email }),
-    });
-
-    // Com que no podem llegir la resposta amb no-cors, avisem l'usuari
-    // i passem al següent pas directament.
-    alert(
-      "📧 S'ha enviat una petició. Si l'email existeix, rebràs el codi en breu.",
-    );
-    document.getElementById("pas1-recuperar").classList.add("hidden");
-    document.getElementById("pas2-recuperar").classList.remove("hidden");
-  } catch (e) {
-    console.error("Error:", e);
-    alert("Hi ha hagut un problema amb la connexió.");
-  } finally {
-    btn.disabled = false;
-    btn.innerText = "Enviar Codi";
-  }
+// Obre el panell de recuperació
+function obrirPantallaRecuperacio() {
+  document.getElementById("tabs-contenidor").classList.add("hidden");
+  document.getElementById("form-usuari").classList.add("hidden");
+  document.getElementById("form-recuperar").classList.remove("hidden");
 }
 
-// PAS 2: Validar codi i canviar pass
-async function executarCanviContrasenya() {
-  const email = document.getElementById("recuperar-email-input").value.trim();
-  const codi = document.getElementById("recuperar-codi-input").value.trim();
-  const novaPass = document.getElementById("recuperar-nova-pass").value.trim();
+// PAS 1: Validar si el nom i la paraula secreta coincideixen
+async function verificarParaulaSecreta() {
+  const nom = document.getElementById("recup-nom").value.trim();
+  const paraula = document.getElementById("recup-paraula").value.trim();
 
-  if (!codi || !novaPass) return alert("Omple tots els camps.");
+  if (!nom || !paraula) return alert("Si us plau, omple els dos camps");
 
   try {
     const resposta = await fetch(API_URL, {
       method: "POST",
-      // Eliminem capçaleres manuals per deixar que el navegador decideixi
       body: JSON.stringify({
-        action: "resetPass",
-        email: email,
-        codi: codi,
-        novaPass: novaPass,
+        action: "verificarParaulaClau",
+        nom: nom,
+        paraula: paraula,
       }),
     });
-
     const dades = await resposta.json();
 
     if (dades.success) {
-      alert(
-        "✅ Contrasenya actualitzada! Ja pots entrar amb la teva nova clau.",
-      );
+      // Si és correcte, passem al Pas 2 (triar nova pass)
+      document.getElementById("pas1-recuperar").classList.add("hidden");
+      document.getElementById("pas2-recuperar").classList.remove("hidden");
+    } else {
+      alert("⚠️ " + dades.message);
+    }
+  } catch (e) {
+    alert("Error de connexió amb el servidor.");
+  }
+}
+
+// PAS 2: Canviar la contrasenya definitivament
+async function executarCanviDirecte() {
+  const nom = document.getElementById("recup-nom").value.trim();
+  const paraula = document.getElementById("recup-paraula").value.trim();
+  const novaPass = document.getElementById("recup-nova-pass").value.trim();
+
+  if (novaPass.length < 4) return alert("La contrasenya és massa curta");
+
+  try {
+    const resposta = await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "canviarPassDirecte",
+        nom: nom,
+        paraula: paraula,
+        novaPass: novaPass,
+      }),
+    });
+    const dades = await resposta.json();
+
+    if (dades.success) {
+      alert("✅ Contrasenya actualitzada correctament!");
       tornarAlLoginDesDeRecuperar();
     } else {
       alert("❌ " + dades.message);
     }
   } catch (e) {
-    // Si l'error de CORS persisteix aquí, normalment és perquè la URL de l'API
-    // ha canviat o no s'ha publicat la "Nova Versió" al Google Script.
-    alert(
-      "Error de seguretat (CORS). Prova d'obrir l'app des d'un servidor (Live Server).",
-    );
+    alert("Error al processar el canvi.");
   }
 }
+
+// Torna a la pantalla de login inicial
+function tornarAlLoginDesDeRecuperar() {
+  document.getElementById("tabs-contenidor").classList.remove("hidden");
+  document.getElementById("form-usuari").classList.remove("hidden");
+  document.getElementById("form-recuperar").classList.add("hidden");
+
+  // Reset dels passos per la pròxima vegada
+  document.getElementById("pas1-recuperar").classList.remove("hidden");
+  document.getElementById("pas2-recuperar").classList.add("hidden");
+
+  // Netegem els inputs
+  document.getElementById("recup-nom").value = "";
+  document.getElementById("recup-paraula").value = "";
+  document.getElementById("recup-nova-pass").value = "";
+}
+
 function tornarAlLoginDesDeRecuperar() {
   document.getElementById("tabs-contenidor").classList.remove("hidden");
   document.getElementById("form-usuari").classList.remove("hidden");

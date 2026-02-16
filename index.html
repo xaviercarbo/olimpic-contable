@@ -67,7 +67,7 @@
           Benvingut a l'Olimpíada <br /><span class="text-indigo-200">Comptable 2026</span>
         </h1>
         <p class="text-indigo-100 text-sm leading-relaxed mb-8 font-medium">
-          Accedeix a la plataforma oficial per resoldre casos pràctics del Pla General Comptable...
+          Accedeix a la plataforma oficial per resoldre casos pràctics del Pla General Comptable i assolir l'excel·lència.
         </p>
         <div class="flex gap-4 items-center">
           <div class="h-[1px] flex-1 bg-indigo-400"></div>
@@ -91,8 +91,8 @@
         </div>
 
         <div id="contenedor-email" class="hidden group">
-          <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block group-focus-within:text-indigo-600 transition-colors">Correu Electrònic (per recuperar accés)</label>
-          <input type="email" id="email-input" placeholder="el-teu@correu.com" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
+          <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block group-focus-within:text-indigo-600 transition-colors">Paraula Secreta (per recuperar accés)</label>
+          <input type="text" id="email-input" placeholder="Ex: El nom del meu gos" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
         </div>
 
         <div id="contenedor-grup" class="hidden">
@@ -120,22 +120,30 @@
       <div id="form-recuperar" class="hidden space-y-6 animate-in fade-in duration-500">
         <div class="mb-4">
           <h3 class="text-xl font-black text-slate-800 uppercase italic">Recuperar Accés</h3>
-          <p class="text-xs text-slate-400 font-medium">T'enviarem un codi de verificació al teu email.</p>
+          <p class="text-xs text-slate-400 font-medium">Verifica la teva paraula secreta per restablir la clau.</p>
         </div>
 
-        <div id="pas1-recuperar">
-          <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block">Escriu el teu Email de registre</label>
-          <input type="email" id="recuperar-email-input" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
-          <button onclick="solicitarCodiRecuperacio()" class="w-full mt-4 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Enviar Codi</button>
+        <div id="pas1-recuperar" class="space-y-4">
+          <div>
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block">El teu Nom d'Usuari</label>
+            <input type="text" id="recup-nom" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block">La teva Paraula Secreta</label>
+            <input type="text" id="recup-paraula" placeholder="La que vas posar en registrar-te" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <button onclick="verificarParaulaSecreta()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Verificar Identitat</button>
         </div>
 
         <div id="pas2-recuperar" class="hidden space-y-4">
-          <input type="text" id="recuperar-codi-input" placeholder="Codi de 6 dígits" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold text-center text-xl tracking-[0.5em]" />
-          <input type="password" id="recuperar-nova-pass" placeholder="Nova Contrasenya" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold" />
-          <button onclick="executarCanviContrasenya()" class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Actualitzar Contrasenya</button>
+          <div>
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1 mb-2 block">Nova Contrasenya</label>
+            <input type="password" id="recup-nova-pass" placeholder="••••••••" class="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <button onclick="executarCanviDirecte()" class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Actualitzar Contrasenya</button>
         </div>
 
-        <button onclick="tornarAlLoginDesDeRecuperar()" class="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition">Tornar enrere</button>
+        <button onclick="tornarAlLoginDesDeRecuperar()" class="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition">Tornar al Login</button>
       </div>
 
     </div>
