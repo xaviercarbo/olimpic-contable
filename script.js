@@ -882,6 +882,35 @@ function actualitzarLecturaBona(el) {
   actualitzarTotalsEnTempsReal();
 }
 
+function actualitzarTotalsEnTempsReal() {
+  let totalDeure = 0;
+  let totalHaver = 0;
+
+  // Sumem tots els inputs de deure i haver
+  document.querySelectorAll(".input-deure").forEach((input) => {
+    totalDeure += parseFloat(input.value) || 0;
+  });
+
+  document.querySelectorAll(".input-haver").forEach((input) => {
+    totalHaver += parseFloat(input.value) || 0;
+  });
+
+  // Actualitzem els textos de la interfície (els elements del peu de taula)
+  const elTotalDeure = document.getElementById("total-deure");
+  const elTotalHaver = document.getElementById("total-haver");
+  const elDiferencia = document.getElementById("diferencia");
+
+  if (elTotalDeure) elTotalDeure.innerText = totalDeure.toFixed(2);
+  if (elTotalHaver) elTotalHaver.innerText = totalHaver.toFixed(2);
+
+  if (elDiferencia) {
+    const dif = Math.abs(totalDeure - totalHaver);
+    elDiferencia.innerText = dif.toFixed(2);
+    // Canviem color si no quadra
+    elDiferencia.className = dif === 0 ? "text-emerald-600" : "text-rose-600";
+  }
+}
+
 // FUNCIÓ AUXILIAR PER AL SCROLL AUTOMÀTIC------------------------------------------------
 function ferScrollAlSegüent(idCompletat) {
   const menu = document.getElementById("menu-temes");
@@ -1697,109 +1726,88 @@ function mostrarInformesFinancers() {
     ...new Set(estat.preguntes.map((p) => p.Tema || p.tema)),
   ].filter(Boolean);
 
+  if (!estat.temaActiu) {
+    container.innerHTML = `<div class="p-20 text-center bg-white border-2 border-dashed border-slate-200 rounded-3xl my-10 max-w-4xl mx-auto">
+      <h2 class="text-xl font-black text-slate-400 uppercase tracking-widest">Generador d'Informes</h2>
+      <p class="text-slate-500 mb-8">Selecciona una unitat didàctica per carregar els estats comptables</p>
+      <select onchange="estat.temaActiu=this.value; mostrarInformesFinancers();" class="p-3 bg-slate-900 text-white rounded-lg font-bold">
+        <option value="">Triar Tema...</option>
+        ${llistaTemes.map((t) => `<option value="${t}">${t}</option>`).join("")}
+      </select>
+    </div>`;
+    return;
+  }
+
   const moviments = obtenirMovimentsDetallatsTema();
   const saldos = {};
-  let r_ing = 0,
-    r_des = 0;
-
   moviments.forEach((m) => {
     if (!saldos[m.codi])
-      saldos[m.codi] = {
-        nom: cercarNomCompte(m.codi),
-        saldo: 0,
-        deure: 0,
-        haver: 0,
-      };
-
+      saldos[m.codi] = { nom: cercarNomCompte(m.codi), deure: 0, haver: 0 };
     saldos[m.codi].deure += m.deure;
     saldos[m.codi].haver += m.haver;
-    saldos[m.codi].saldo += m.deure - m.haver;
-
-    if (String(m.codi).startsWith("7")) r_ing += m.haver - m.deure;
-    if (String(m.codi).startsWith("6")) r_des += m.deure - m.haver;
   });
 
-  const resExercici = r_ing - r_des;
-  let totalActiuGlobal = 0;
-  let totalPassiuGlobal = 0;
+  let r_pyg = 0;
+  Object.keys(saldos).forEach((c) => {
+    if (c.startsWith("6") || c.startsWith("7"))
+      r_pyg += saldos[c].haver - saldos[c].deure;
+  });
+  const resExercici = r_pyg;
 
-  // RENDERITZADOR DE BALANÇ (ACTIU / PASSIU)
+  let totalActiuGlobal = 0,
+    totalPassiuGlobal = 0;
+
   const renderTaulaPGC = (bloc, esPassiu = false) => {
     return bloc
       .map((seccio) => {
         let sumaSeccio = 0;
         const htmlSub = seccio.sub
           .map((s) => {
-            let saldoSub = 0;
-            let comptesHTML = "";
-
+            let saldoSub = 0,
+              comptesHTML = "";
             if (s.esResultat) {
               saldoSub = resExercici;
-              comptesHTML = `
-            <div class="flex justify-between items-center pl-8 py-1 text-[10px] text-slate-400 italic">
-              <span>(Càlcul P&G)</span>
-              <span class="w-32 text-right">${formatSAP(resExercici)}</span>
-            </div>`;
+              comptesHTML = `<div class="flex justify-between items-center pl-8 py-1 text-[10px] text-slate-400 italic"><span>(Càlcul P&G)</span><span class="w-32 text-right ${saldoSub < 0 ? "text-blue-600" : ""}">${formatSAP(resExercici)}</span></div>`;
             } else {
               const codis = Object.keys(saldos).filter((c) => s.regex.test(c));
-              const saldoNetGrup = codis.reduce(
-                (acc, c) => acc + saldos[c].saldo,
+              saldoSub = codis.reduce(
+                (acc, c) =>
+                  acc +
+                  (esPassiu
+                    ? saldos[c].haver - saldos[c].deure
+                    : saldos[c].deure - saldos[c].haver),
                 0,
               );
-              saldoSub = esPassiu ? -saldoNetGrup : saldoNetGrup;
-
               comptesHTML = codis
                 .map((c) => {
-                  const saldoIndividual = esPassiu
-                    ? -saldos[c].saldo
-                    : saldos[c].saldo;
-                  // CORRECCIÓ: Fem servir veureDetallCompte
-                  return `
-              <div onclick="veureDetallCompte('${c}')" class="flex justify-between items-center pl-8 py-1 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 group">
+                  const sInd = esPassiu
+                    ? saldos[c].haver - saldos[c].deure
+                    : saldos[c].deure - saldos[c].haver;
+                  return `<div onclick="veureDetallCompte('${c}')" class="flex justify-between items-center pl-8 py-1 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 group">
                 <span class="text-[11px] text-slate-600 group-hover:text-indigo-700"><b>${c}</b> ${saldos[c].nom}</span>
-                <span class="w-32 text-right font-mono text-[11px] text-slate-500">${formatSAP(saldoIndividual)}</span>
+                <span class="w-32 text-right font-mono text-[11px] ${sInd < 0 ? "text-blue-600" : "text-slate-500"}">${formatSAP(sInd)}</span>
               </div>`;
                 })
                 .join("");
             }
-
             sumaSeccio += saldoSub;
-            return `
-          <div class="border-b border-slate-100 last:border-0">
-            <div class="flex justify-between items-center px-4 py-2 bg-slate-50/30">
-              <span class="text-[10px] font-bold text-slate-700 uppercase">${s.titol}</span>
-              <span class="w-32 text-right font-mono text-[11px] font-bold">${formatSAP(saldoSub)}</span>
-            </div>
-            ${comptesHTML}
-          </div>`;
+            return `<div class="border-b border-slate-100 last:border-0"><div class="flex justify-between items-center px-4 py-2 bg-slate-50/30"><span class="text-[10px] font-bold text-slate-700 uppercase">${s.titol}</span><span class="w-32 text-right font-mono text-[11px] font-bold ${saldoSub < 0 ? "text-blue-600" : ""}">${formatSAP(saldoSub)}</span></div>${comptesHTML}</div>`;
           })
           .join("");
-
         if (esPassiu) totalPassiuGlobal += sumaSeccio;
         else totalActiuGlobal += sumaSeccio;
-
-        return `
-        <div class="mb-4 bg-white border-x border-slate-200">
-          <div class="bg-slate-200/50 px-4 py-1.5 border-y border-slate-200 flex justify-between items-center uppercase font-black text-[10px] tracking-widest text-slate-900">
-            <span>${seccio.titol}</span>
-            <span class="w-32 text-right font-mono">${formatSAP(sumaSeccio)}</span>
-          </div>
-          ${htmlSub}
-        </div>`;
+        return `<div class="mb-4 bg-white border-x border-slate-200"><div class="bg-slate-200/50 px-4 py-1.5 border-y border-slate-200 flex justify-between items-center uppercase font-black text-[10px] tracking-widest text-slate-900"><span>${seccio.titol}</span><span class="w-32 text-right font-mono ${sumaSeccio < 0 ? "text-blue-600" : ""}">${formatSAP(sumaSeccio)}</span></div>${htmlSub}</div>`;
       })
       .join("");
   };
 
   container.innerHTML = `
     <div class="p-8 max-w-7xl mx-auto font-sans bg-white shadow-2xl my-10 border border-slate-300">
-      
       <div class="flex justify-between items-start mb-10 border-b-2 border-slate-900 pb-6">
-        <div>
-          <h1 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Estats Comptables Oficials</h1>
-          <p class="text-xs text-slate-500 font-bold uppercase tracking-widest">Tema: ${estat.temaActiu} | Exercici 202X</p>
-        </div>
+        <div><h1 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Estats Comptables Oficials</h1><p class="text-xs text-slate-500 font-bold uppercase">Tema: ${estat.temaActiu}</p></div>
         <div class="no-print bg-slate-100 p-3 rounded flex items-center gap-3">
           <select onchange="estat.temaActiu=this.value; mostrarInformesFinancers();" class="text-xs font-bold bg-transparent border-none">
+            <option value="">Canviar Tema...</option>
             ${llistaTemes.map((t) => `<option value="${t}" ${t === estat.temaActiu ? "selected" : ""}>${t}</option>`).join("")}
           </select>
         </div>
@@ -1807,282 +1815,153 @@ function mostrarInformesFinancers() {
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-0 border border-slate-300">
         <div class="border-r border-slate-300">
-          <div class="bg-slate-900 text-white p-2 text-center text-xs font-bold uppercase tracking-widest">Actiu (Inversions)</div>
-          ${renderTaulaPGC(ESTRUCTURA_PGC_FINAL.actiu)}
-          <div class="bg-slate-900 text-white p-4 flex justify-between items-center mt-auto">
-            <span class="text-xs font-black uppercase">TOTAL ACTIU</span>
-            <span class="font-mono text-lg font-black">${formatSAP(totalActiuGlobal)}</span>
+          <div class="bg-slate-900 text-white p-2 text-center text-xs font-bold uppercase tracking-widest">Actiu</div>
+          ${renderTaulaPGC(ESTRUCTURA_PGC_FINAL.actiu, false)}
+          <div class="bg-slate-900 text-white p-4 flex justify-between items-center">
+            <span class="text-xs font-black uppercase">TOTAL ACTIU</span><span class="font-mono text-lg font-black">${formatSAP(totalActiuGlobal)}</span>
           </div>
         </div>
-
         <div class="flex flex-col">
           <div class="bg-slate-800 text-white p-2 text-center text-xs font-bold uppercase tracking-widest">Patrimoni Net i Passiu</div>
           ${renderTaulaPGC(ESTRUCTURA_PGC_FINAL.passiu, true)}
-          <div class="bg-slate-800 text-white p-4 flex justify-between items-center mt-auto border-t border-slate-600">
-            <span class="text-xs font-black uppercase">TOTAL PATRIMONI I PASSIU</span>
-            <span class="font-mono text-lg font-black">${formatSAP(totalPassiuGlobal)}</span>
+          <div class="bg-slate-800 text-white p-4 flex justify-between items-center border-t border-slate-600">
+            <span class="text-xs font-black uppercase">TOTAL P. NET I PASSIU</span><span class="font-mono text-lg font-black">${formatSAP(totalPassiuGlobal)}</span>
           </div>
         </div>
       </div>
 
       <div class="mt-12 border border-slate-300 bg-white">
-        <div class="bg-indigo-900 text-white p-2 text-center text-xs font-bold uppercase tracking-widest italic">
-          Compte de Pèrdues i Guanys (Estructura PGC)
-        </div>
-        
+        <div class="bg-indigo-900 text-white p-2 text-center text-xs font-bold uppercase tracking-widest italic">Compte de Pèrdues i Guanys (Estructura PGC)</div>
         <div class="p-0">
           ${(() => {
-            let acumExplotacio = 0;
-            let acumFinancer = 0;
-
-            return ESTRUCTURA_PYG_PGC.map((e) => {
+            let acumExplo = 0,
+              acumFin = 0;
+            return ESTRUCTURA_PYG_PGC.map((e, idx) => {
               if (e.esSubtotal) {
-                let valor = 0;
-                let classeFons =
-                  "bg-slate-100 font-bold border-y border-slate-200";
-                if (e.esSubtotal === "explotacio") valor = acumExplotacio;
-                if (e.esSubtotal === "financer") valor = acumFinancer;
-                if (e.esSubtotal === "ebt")
-                  valor = acumExplotacio + acumFinancer;
+                let v = 0,
+                  cl = "bg-slate-100 font-bold border-y border-slate-200";
+                if (e.esSubtotal === "explotacio") v = acumExplo;
+                if (e.esSubtotal === "financer") v = acumFin;
+                if (e.esSubtotal === "ebt") v = acumExplo + acumFin;
                 if (e.esSubtotal === "final") {
-                  valor = resExercici;
-                  classeFons = "bg-indigo-900 text-white font-black text-sm";
+                  v = resExercici;
+                  cl = "bg-indigo-900 text-white font-black text-sm";
                 }
-                return `
-                  <div class="flex justify-between px-4 py-3 ${classeFons} text-[10px] uppercase">
-                    <span>${e.titol}</span>
-                    <span class="font-mono">${formatSAP(valor)}</span>
-                  </div>`;
+                return `<div class="flex justify-between px-4 py-3 ${cl} text-[10px] uppercase"><span>${e.titol}</span><span class="font-mono ${v < 0 ? (e.esSubtotal === "final" ? "text-white" : "text-blue-600") : ""}">${formatSAP(v)}</span></div>`;
               }
-
-              const codisEpigraf = Object.keys(saldos).filter((c) =>
-                e.regex.test(c),
-              );
-              let sumaEpigraf = 0;
-
-              const htmlComptes = codisEpigraf
+              const codis = Object.keys(saldos).filter((c) => e.regex.test(c));
+              let sumaEpi = 0;
+              const html = codis
                 .map((c) => {
-                  const s = saldos[c];
-                  const saldoNet = c.startsWith("7")
-                    ? s.haver - s.deure
-                    : s.deure - s.haver;
-                  const impacte = c.startsWith("7") ? saldoNet : -saldoNet;
-                  sumaEpigraf += impacte;
-
-                  if (e.titol.match(/^[1-6]/)) acumExplotacio += impacte;
-                  if (e.titol.match(/^[7-8]/)) acumFinancer += impacte;
-
-                  // CORRECCIÓ: Fem servir veureDetallCompte
-                  return `
-                  <div onclick="veureDetallCompte('${c}')" class="flex justify-between pl-10 pr-4 py-1 text-[10px] text-slate-500 italic border-b border-slate-50 hover:bg-indigo-50 cursor-pointer group">
-                    <span class="group-hover:text-indigo-700"><b>${c}</b> ${s.nom}</span>
-                    <span class="font-mono">${formatSAP(saldoNet)}</span>
-                  </div>`;
+                  const s = saldos[c],
+                    n = s.haver - s.deure;
+                  sumaEpi += n;
+                  if (idx <= 5) acumExplo += n;
+                  else if (idx <= 8) acumFin += n;
+                  return `<div onclick="veureDetallCompte('${c}')" class="flex justify-between pl-10 pr-4 py-1 text-[10px] text-slate-500 italic border-b border-slate-50 hover:bg-indigo-50 cursor-pointer group">
+                  <span class="group-hover:text-indigo-700"><b>${c}</b> ${s.nom}</span><span class="font-mono ${n < 0 ? "text-blue-600" : ""}">${formatSAP(n)}</span>
+                </div>`;
                 })
                 .join("");
-
-              if (codisEpigraf.length === 0) return "";
-
-              return `
-                <div>
-                  <div class="flex justify-between px-4 py-2 text-[10px] font-bold text-slate-700 bg-slate-50/50 border-b border-slate-100">
-                    <span>${e.titol}</span>
-                    <span class="font-mono">${formatSAP(sumaEpigraf)}</span>
-                  </div>
-                  ${htmlComptes}
-                </div>`;
+              return codis.length
+                ? `<div><div class="flex justify-between px-4 py-2 text-[10px] font-bold text-slate-700 bg-slate-50/50 border-b border-slate-100"><span>${e.titol}</span><span class="font-mono ${sumaEpi < 0 ? "text-blue-600" : ""}">${formatSAP(sumaEpi)}</span></div>${html}</div>`
+                : "";
             }).join("");
           })()}
         </div>
       </div>
     </div>
-    <div id="modal-drilldown" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[500] flex items-center justify-center p-4"></div>
-  `;
+    <div id="modal-drilldown" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[500] flex items-center justify-center p-4"></div>`;
 }
-// B. Generació del Balanç i P&G (Visió SAP)
-// Aquesta funció agrupa els moviments i els presenta com un informe oficial.
+
+function obtenirSigneCompte(codi) {
+  const c = String(codi);
+  // Passiu (1, 40, 41, 475, 52...) i P&G (6, 7) funcionen amb Haver - Deure
+  if (
+    c.startsWith("1") ||
+    c.startsWith("40") ||
+    c.startsWith("41") ||
+    c.startsWith("475") ||
+    c.startsWith("476") ||
+    c.startsWith("477") ||
+    c.startsWith("52") ||
+    c.startsWith("17") ||
+    c.startsWith("6") ||
+    c.startsWith("7")
+  ) {
+    return "H-D";
+  }
+  // Actiu (2, 3, 43, 57...) funciona amb Deure - Haver
+  return "D-H";
+}
+
 function veureDetallCompte(codi) {
   const moviments = obtenirMovimentsDetallatsTema().filter(
     (m) => String(m.codi) === String(codi),
   );
+
   const modal = document.getElementById("modal-drilldown");
   if (!modal) return;
 
-  // --- CONFIGURACIÓ DE SIGNES ---
-  // Afegeix aquí els prefixos segons el comportament que vulguis:
-
-  const regles = {
-    // Sumen per l'HAVER (H-D): Ingressos, Deutes, Devolucions de compra
-    positiusHaver: [
-      "7",
-      "1",
-      "40",
-      "41",
-      "475",
-      "477",
-      "52",
-      "17",
-      "606",
-      "608",
-      "609",
-    ],
-
-    // Sumen pel DEURE (D-H): Actius, Despeses, Devolucions de venda
-    positiusDeure: [
-      "2",
-      "3",
-      "43",
-      "472",
-      "57",
-      "600",
-      "601",
-      "602",
-      "607",
-      "62",
-      "708",
-      "709",
-    ],
-  };
-
-  // Funció interna per decidir el signe
-  const decidirSigne = (c) => {
-    const codiStr = String(c);
-    // 1. Prioritat: Si està a la llista d'Haver (com la 608 que és "excepció" del grup 6)
-    if (regles.positiusHaver.some((p) => codiStr.startsWith(p))) return "H-D";
-    // 2. Si està a la llista de Deure
-    if (regles.positiusDeure.some((p) => codiStr.startsWith(p))) return "D-H";
-    // 3. Per defecte (casos no definits), mirem el primer número
-    return codiStr.startsWith("6") ||
-      codiStr.startsWith("2") ||
-      codiStr.startsWith("43")
-      ? "D-H"
-      : "H-D";
-  };
-
-  const modeSigne = decidirSigne(codi);
+  const modeSigne = obtenirSigneCompte(codi);
   let saldoAcu = 0;
+  const nomCompte = cercarNomCompte(codi);
 
   const files = moviments
     .map((m) => {
-      // Apliquem la lògica segons el mode decidit
       const impacte =
         modeSigne === "H-D" ? m.haver - m.deure : m.deure - m.haver;
-
-      // AJUST ESPECÍFIC P&G: Si és una despesa pura (600, 62...) i volem que resti al drill-down
-      // Com que a la P&G vols veure la 600 com a "-2.600", forcem el signe negatiu aquí:
-      let impacteVisual = impacte;
-      if (
-        codi.startsWith("6") &&
-        !["606", "608", "609"].some((p) => codi.startsWith(p))
-      ) {
-        impacteVisual = impacte * -1;
-      }
-
-      saldoAcu += impacteVisual;
+      saldoAcu += impacte;
 
       return `
       <tr class="text-[11px] border-b border-slate-100 hover:bg-slate-50 transition">
         <td class="p-3 text-slate-400 font-mono italic">#${m.id}</td>
         <td class="p-3 text-slate-700 font-medium">${m.concepte || "Apunt"}</td>
         <td class="p-3 text-right font-mono text-emerald-600">${m.deure > 0 ? formatSAP(m.deure) : "-"}</td>
-        <td class="p-3 text-right font-mono text-rose-600">${m.haver > 0 ? formatSAP(m.haver) : "-"}</td>
-        <td class="p-3 text-right font-mono font-bold ${saldoAcu >= 0 ? "text-slate-900" : "text-rose-600"}">
+        <td class="p-3 text-right font-mono text-blue-600">${m.haver > 0 ? formatSAP(m.haver) : "-"}</td>
+        <td class="p-3 text-right font-mono font-black ${saldoAcu < 0 ? "text-blue-600" : "text-slate-900"}">
           ${formatSAP(saldoAcu)}
         </td>
       </tr>`;
     })
     .join("");
 
-  // Estructura visual del Modal (HTML)
   modal.innerHTML = `
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-300">
-      <div class="bg-slate-800 p-4 flex justify-between items-center text-white">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-300 animate-in zoom-in duration-200">
+      <div class="bg-slate-900 p-5 text-white flex justify-between items-center">
         <div>
-          <h3 class="text-lg font-bold">${codi} - ${cercarNomCompte(codi)}</h3>
-          <p class="text-[9px] text-slate-400 uppercase tracking-widest">
-            Mode: ${codi.startsWith("6") ? "Impacte en P&G (Negatiu = Despesa)" : "Saldo Acumulat"}
-          </p>
+          <h3 class="text-lg font-black uppercase tracking-tighter italic">Llibre Major: ${codi}</h3>
+          <p class="text-[10px] text-slate-400 font-bold uppercase">${nomCompte}</p>
         </div>
-        <button onclick="document.getElementById('modal-drilldown').classList.add('hidden')" class="w-8 h-8 rounded-full bg-slate-700 hover:bg-rose-600 transition">✕</button>
+        <button onclick="document.getElementById('modal-drilldown').classList.add('hidden')" 
+                class="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-blue-600 transition text-xl">
+          &times;
+        </button>
       </div>
-      <div class="max-h-[50vh] overflow-y-auto">
-        <table class="w-full text-left">
-          <thead class="sticky top-0 bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b">
-            <tr>
-              <th class="p-3">Ref</th>
+      <div class="max-h-[60vh] overflow-y-auto">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-50 sticky top-0 border-b border-slate-200 z-10">
+            <tr class="text-[10px] font-black uppercase text-slate-500">
+              <th class="p-3 w-16">Ref</th>
               <th class="p-3">Concepte</th>
-              <th class="p-3 text-right text-emerald-700">Deure</th>
-              <th class="p-3 text-right text-rose-700">Haver</th>
-              <th class="p-3 text-right bg-slate-100/50">Saldo</th>
+              <th class="p-3 text-right text-emerald-700">Deure (+)</th>
+              <th class="p-3 text-right text-blue-700">Haver (-)</th>
+              <th class="p-3 text-right bg-slate-100/50">Saldo Acum.</th>
             </tr>
           </thead>
           <tbody>${files}</tbody>
         </table>
       </div>
-      <div class="p-4 bg-slate-100 border-t flex justify-between items-center">
-        <span class="text-[10px] text-slate-500 italic">El signe reflecteix el comportament en l'informe financer.</span>
+      <div class="p-5 bg-slate-50 border-t flex justify-between items-center">
+        <span class="text-[9px] text-slate-400 uppercase font-bold">Criteri: ${modeSigne}</span>
         <div class="text-right">
-          <div class="text-[10px] font-bold text-slate-400 uppercase">Saldo Final</div>
-          <div class="text-xl font-black ${saldoAcu >= 0 ? "text-slate-900" : "text-rose-600"}">${formatSAP(saldoAcu)}</div>
+          <span class="text-[10px] font-black uppercase block text-slate-400">Saldo Final</span>
+          <span class="text-2xl font-mono font-black ${saldoAcu < 0 ? "text-blue-600" : "text-slate-900"}">${formatSAP(saldoAcu)}</span>
         </div>
       </div>
     </div>`;
   modal.classList.remove("hidden");
 }
-window.obrirDrillDown = function (codi) {
-  const moviments = obtenirMovimentsDetallatsTema();
-  const movsCompte = moviments.filter((m) => m.codi === codi);
-  const nom = cercarNomCompte(codi);
-  const modal = document.getElementById("modal-audit");
-
-  if (!modal) return;
-
-  let files = movsCompte
-    .map(
-      (m) => `
-    <tr class="border-b border-slate-100 text-[11px] hover:bg-indigo-50/30">
-      <td class="p-3 text-slate-400 font-mono italic">#${m.id}</td>
-      <td class="p-3 font-medium text-slate-700">${m.concepte}</td>
-      <td class="p-3 text-right font-mono text-indigo-600 bg-indigo-50/20">${m.deure > 0 ? formatSAP(m.deure) : "-"}</td>
-      <td class="p-3 text-right font-mono text-rose-600 bg-rose-50/20">${m.haver > 0 ? formatSAP(m.haver) : "-"}</td>
-    </tr>
-  `,
-    )
-    .join("");
-
-  modal.innerHTML = `
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-300 animate-in zoom-in duration-150">
-      <div class="bg-slate-900 p-5 text-white flex justify-between items-center">
-        <div>
-          <h3 class="text-lg font-black uppercase tracking-tighter italic">Auditoria Major: ${codi}</h3>
-          <p class="text-[10px] text-slate-400 font-bold uppercase">${nom}</p>
-        </div>
-        <button onclick="document.getElementById('modal-audit').classList.add('hidden')" class="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-xl">&times;</button>
-      </div>
-      <div class="max-h-[60vh] overflow-y-auto">
-        <table class="w-full text-left border-collapse">
-          <thead class="bg-slate-100 sticky top-0 border-b border-slate-300">
-            <tr class="text-[10px] font-black uppercase text-slate-500">
-              <th class="p-3">Ref</th>
-              <th class="p-3">Concepte (Columna Q)</th>
-              <th class="p-3 text-right">Deure (+)</th>
-              <th class="p-3 text-right">Haver (-)</th>
-            </tr>
-          </thead>
-          <tbody>${files}</tbody>
-        </table>
-      </div>
-      <div class="p-5 bg-slate-900 text-white flex justify-between items-center">
-        <span class="text-[10px] font-bold uppercase opacity-60 italic underline">Final Audit Statement</span>
-        <div class="text-right">
-          <span class="text-[10px] font-black uppercase block opacity-60">Saldo Net del Compte</span>
-          <span class="text-2xl font-mono font-black">${formatSAP(movsCompte.reduce((acc, m) => acc + (m.deure - m.haver), 0))}</span>
-        </div>
-      </div>
-    </div>
-  `;
-  modal.classList.remove("hidden");
-};
 
 function seleccionarTemaDesDeInformes(nouTema) {
   if (!nouTema) return;
@@ -2101,91 +1980,91 @@ function cercarNomCompte(codi) {
 
 //--- Informes FINANCER -----------------------------------------------------------
 
-//3. Implementació del Codi (Estructura Resumit)
-function renderitzarSeccioPGC(titol, filtre, saldos) {
-  // Filtrem quins comptes de "saldos" pertanyen a aquest epígraf
-  const comptesSeccio = Object.keys(saldos).filter((codi) => filtre.test(codi));
-  if (comptesSeccio.length === 0) return "";
-
-  let sumaTotal = 0;
-  let htmlComptes = comptesSeccio
-    .map((codi) => {
-      const s = saldos[codi];
-      const saldo = s.deure - s.haver;
-      sumaTotal += saldo;
-      return `
-      <div onclick="veureDetallCompte('${codi}')" class="flex justify-between pl-8 py-1 hover:bg-indigo-50 cursor-pointer text-[10px] border-l-2 border-slate-100 ml-4">
-        <span class="text-slate-600">${codi} - ${s.nom}</span>
-        <span class="font-mono font-bold">${Math.abs(saldo).toFixed(2)}€</span>
-      </div>`;
-    })
-    .join("");
-
-  return `
-    <div class="mb-4">
-      <div class="flex justify-between bg-slate-100 p-2 rounded-lg font-black text-[11px] text-slate-700 uppercase tracking-tighter">
-        <span>${titol}</span>
-        <span>${Math.abs(sumaTotal).toFixed(2)}€</span>
-      </div>
-      <div class="mt-1">${htmlComptes}</div>
-    </div>
-  `;
-}
-
 function toggleSidebar() {
-  const sidebar = document.getElementById("sidebar");
-  // Simplement afegim o treiem la classe que amaga l'aside
-  sidebar.classList.toggle("-translate-x-full");
+  const sidebar = document.getElementById("sidebar-main");
+  const main = document.getElementById("main-content");
+  const btnToggle = document.getElementById("btn-toggle-main");
+
+  if (!sidebar || !main) return;
+
+  // Comprovem si la barra està visible (sense la classe translate-x)
+  const isVisible = !sidebar.classList.contains("-translate-x-full");
+
+  if (isVisible) {
+    // ACCIÓ: AMAGAR (Desplaçar a l'esquerra i treure marge)
+    sidebar.classList.add("-translate-x-full");
+    main.classList.remove("ml-64");
+    // Opcional: mostrar el botó de menú més clarament
+    btnToggle.classList.add("opacity-100");
+  } else {
+    // ACCIÓ: MOSTRAR (Tornar a posició 0 i afegir marge)
+    sidebar.classList.remove("-translate-x-full");
+    main.classList.add("ml-64");
+  }
 }
 
-// Gestió de la tecla Intro per navegar com un professional
+// Opcional: Si vols que en mòbils comenci tancada
+window.addEventListener("load", () => {
+  if (window.innerWidth < 1024) {
+    toggleSidebar();
+  }
+});
+
+// Gestió de la tecla Intro amb protecció contra errors de lectura (null)
 document.addEventListener("keydown", function (e) {
   if (e.key === "Enter") {
     const activeEl = document.activeElement;
+    if (!activeEl || !activeEl.classList) return;
 
-    // Si estem dins d'un input de la taula de diari
-    if (
+    const esInputDiari =
       activeEl.classList.contains("select-compte") ||
       activeEl.classList.contains("input-deure") ||
-      activeEl.classList.contains("input-haver")
-    ) {
-      e.preventDefault(); // Evitem que l'Intro faci coses rares
+      activeEl.classList.contains("input-haver");
+
+    if (esInputDiari) {
+      e.preventDefault();
+
+      // Guardem la dada i actualitzem totals sense que petis el programa
+      activeEl.dispatchEvent(new Event("change", { bubbles: true }));
+
+      // EXECUTEM LA FUNCIÓ DE TOTALS NOMÉS SI EXISTEIX
+      if (typeof actualitzarTotalsEnTempsReal === "function") {
+        actualitzarTotalsEnTempsReal();
+      }
+
       const fila = activeEl.closest("tr");
+      if (!fila) return;
 
-      // 1. Si estem al CODI
       if (activeEl.classList.contains("select-compte")) {
-        // Anem al DEURE
-        fila.querySelector(".input-deure").focus();
-      }
-
-      // 2. Si estem al DEURE
-      else if (activeEl.classList.contains("input-deure")) {
-        if (activeEl.value === "" || parseFloat(activeEl.value) === 0) {
-          // Si està buit, anem al HAVER de la mateixa fila
-          fila.querySelector(".input-haver").focus();
+        const seguent = fila.querySelector(".input-deure");
+        if (seguent) seguent.focus();
+      } else if (activeEl.classList.contains("input-deure")) {
+        const valorDeure = parseFloat(activeEl.value) || 0;
+        if (valorDeure === 0) {
+          const seguent = fila.querySelector(".input-haver");
+          if (seguent) seguent.focus();
         } else {
-          // Si té dades, anem a una NOVA FILA (Codi)
-          accionsTeclatNovaFila();
+          executarNovaFila();
         }
-      }
-
-      // 3. Si estem al HAVER
-      else if (activeEl.classList.contains("input-haver")) {
-        // Anem a una NOVA FILA (Codi)
-        accionsTeclatNovaFila();
+      } else if (activeEl.classList.contains("input-haver")) {
+        executarNovaFila();
       }
     }
   }
 });
 
-function accionsTeclatNovaFila() {
-  afegirFila(); // Cridem la teva funció existent
-  // Esperem un mil·lisegon que el DOM es refresqui i anem a l'última fila creada
-  setTimeout(() => {
-    const files = document.querySelectorAll("#diari-body tr");
-    const ultimaFila = files[files.length - 1];
-    if (ultimaFila) ultimaFila.querySelector(".select-compte").focus();
-  }, 10);
+function executarNovaFila() {
+  if (typeof afegirFila === "function") {
+    afegirFila();
+    setTimeout(() => {
+      const files = document.querySelectorAll("#taula-assentament tbody tr");
+      if (files.length > 0) {
+        const ultimaFila = files[files.length - 1];
+        const inputCodi = ultimaFila.querySelector(".select-compte");
+        if (inputCodi) inputCodi.focus();
+      }
+    }, 50);
+  }
 }
 
 function logout() {

@@ -152,80 +152,89 @@
 
 <div class="flex h-screen overflow-hidden">
   
-  <button 
-    onclick="toggleSidebar()" 
-    class="block lg:hidden fixed top-4 left-4 z-[60] bg-slate-900 text-white p-2 rounded-lg border border-slate-700 shadow-xl"
-  >
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  </button>
-
-  <aside
-    id="sidebar"
-    class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white flex flex-col border-r border-slate-800 transition-transform duration-300 transform -translate-x-full lg:translate-x-0 lg:static lg:inset-y-0"
-  >
-    <div class="p-5 border-b border-slate-800 flex justify-between items-center">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-lg italic shadow-lg shadow-indigo-500/20">
-          OC
-        </div>
-        <div>
-          <h1 class="font-black text-xs tracking-tighter italic uppercase leading-none">Olimpíada</h1>
-          <p class="text-[9px] text-indigo-400 font-bold uppercase tracking-widest">Comptabilitat</p>
-        </div>
-      </div>
-      <button onclick="toggleSidebar()" class="lg:hidden text-slate-500 hover:text-white">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-
-    <nav class="flex-1 overflow-y-auto p-4 space-y-6 custom-scroll">
-      <div>
-        <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 ml-2">Menú</p>
-        <ul class="space-y-1">
-          <li>
-            <button onclick="mostrarSeccio('dashboard')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300">
-              📊 Dashboard
+    <div class="flex h-screen overflow-hidden">
+  
+            <button 
+              onclick="toggleSidebar()" 
+              class="fixed top-4 left-4 z-[100] bg-slate-900 text-white p-2 rounded-lg shadow-lg hover:bg-indigo-600 transition-all border border-slate-700" 
+              id="btn-toggle"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             </button>
-          </li>
-          <li>
-            <button onclick="mostrarSeccio('progres')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300">
-              📈 Progrés
-            </button>
-          </li>
-          <li id="item-menu-ranquing" class="hidden">
-            <button onclick="mostrarSeccio('ranquing')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300">
-              🏆 Rànquing Global
-            </button>
-          </li>
-           <li>
-       <button onclick="mostrarSeccio('informes'); mostrarInformesFinancers();" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300">
-       🏢 Informes Financers
-      </button>
-       </li>
-        </ul>
-      </div>      
 
-      <div>
-        <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 ml-2">Exercicis</p>
-        <ul id="menu-temes" class="space-y-1"></ul>
-      </div>
-    </nav>
+            <aside
+              id="sidebar-main"
+              class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white flex flex-col border-r border-slate-800 transition-transform duration-300 transform translate-x-0"
+            >
+              <div class="p-5 border-b border-slate-800 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-lg italic shadow-lg shadow-indigo-500/20">
+                    OC
+                  </div>
+                  <div>
+                    <h1 class="font-black text-xs tracking-tighter italic uppercase leading-none">Olimpíada</h1>
+                    <p class="text-[9px] text-indigo-400 font-bold uppercase tracking-widest">Comptabilitat</p>
+                  </div>
+                </div>
+                <button onclick="toggleSidebar()" class="lg:hidden text-slate-500 hover:text-white">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-    <div id="user-perfil" class="p-4 bg-slate-800/30 border-t border-slate-800 flex items-center gap-3">
-      <div id="user-icon" class="w-10 h-10 rounded-full overflow-hidden border border-slate-700 bg-slate-700"></div>
-      <div class="flex-1">
-        <p id="user-nom" class="font-black text-[10px] uppercase italic truncate">Estudiant</p>
-        <button onclick="logout()" class="text-[9px] font-bold text-rose-400 hover:text-rose-300 uppercase tracking-tighter">
-          Sortir
-        </button>
-      </div>
-    </div>
-  </aside>
+              <nav class="flex-1 overflow-y-auto p-4 space-y-6 custom-scroll">
+                <div>
+                  <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 ml-2">Menú</p>
+                  <ul class="space-y-1">
+                    <li>
+                      <button onclick="mostrarSeccio('dashboard')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300">
+                        📊 Dashboard
+                      </button>
+                    </li>
+                    <li>
+                      <button onclick="mostrarSeccio('progres')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300">
+                        📈 Progrés
+                      </button>
+                    </li>
+                    <li id="item-menu-ranquing" class="hidden">
+                      <button onclick="mostrarSeccio('ranquing')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300">
+                        🏆 Rànquing Global
+                      </button>
+                    </li>
+                    <li>
+                      <button onclick="mostrarSeccio('informes'); mostrarInformesFinancers();" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition font-bold text-xs text-slate-300">
+                        🏢 Informes Financers
+                      </button>
+                    </li>
+                  </ul>
+                </div>
 
+                <div>
+                  <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 ml-2">Exercicis</p>
+                  <ul id="menu-temes" class="space-y-1">
+                    </ul>
+                </div>
+              </nav>
+
+              <div id="user-perfil" class="p-4 bg-slate-800/30 border-t border-slate-800 flex items-center gap-3">
+                <div id="user-icon" class="w-10 h-10 rounded-full overflow-hidden border border-slate-700 bg-slate-700"></div>
+                <div class="flex-1">
+                  <p id="user-nom" class="font-black text-[10px] uppercase italic truncate">Estudiant</p>
+                  <button onclick="logout()" class="text-[9px] font-bold text-rose-400 hover:text-rose-300 uppercase tracking-tighter">
+                    Sortir
+                  </button>
+                </div>
+              </div>
+            </aside>
+
+            <main id="main-content" class="flex-1 ml-64 transition-all duration-300 bg-slate-50 overflow-y-auto h-screen p-6">
+              </main>
+
+          </div>
+              
       <main class="flex-1 flex flex-col overflow-hidden relative">
         <header
           class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-10 shrink-0"
