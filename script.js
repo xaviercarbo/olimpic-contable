@@ -577,41 +577,309 @@ function mostrarPregunta() {
   const p = estat.preguntaActual;
   if (!p) return;
 
-  // DEFINIM EL TEMA ACTIU (Indispensable per filtrar els Majors)
-  estat.temaActiu = p.Tema || p.tema;
-
-  const btnValidar = document.getElementById("btn-validar");
-  const btnSeguent = document.getElementById("btn-seguent");
-  if (!btnValidar || !btnSeguent) return;
-
-  // Comprovem si l'ID ja està a la llista de completats
-  const idActual = String(p.ID || p.id).trim();
-  const jaFeta = estat.completats.includes(idActual);
-
-  if (jaFeta) {
-    btnValidar.classList.add("hidden");
-    btnSeguent.innerText = "Següent Exercici ➡️";
-    btnSeguent.classList.remove("hidden");
-  } else {
-    btnValidar.classList.remove("hidden");
-    btnSeguent.innerText = "Saltar Exercici ⏭️";
-    btnSeguent.classList.remove("hidden");
-  }
-
+  // 1. SEMPRE ACTUALITZAR L'ENUNCIAT I EL TEMA
   const enunciatEl = document.getElementById("txt-enunciat");
   const temaEl = document.getElementById("info-pregunta");
-  if (enunciatEl)
-    enunciatEl.innerText = p.Enunciat || p.enunciat || p.Descripcio;
-  if (temaEl) temaEl.innerText = estat.temaActiu;
 
-  // --- REFRESC DEL LLIBRE MAJOR ACUMULAT ---
-  // Això mostrarà totes les "T" del tema actual que ja estiguin al Sheet
+  if (enunciatEl) {
+    enunciatEl.innerText = p.Enunciat || p.Descripcio || p.enunciat || "";
+  }
+  if (temaEl) {
+    temaEl.innerText = p.Tema || p.tema || "";
+  }
 
-  // Reset de la taula de treball
-  estat.assentament = [];
-  afegirFila();
-  renderTaula();
+  const idActual = String(p.ID_Activitat || p.id).trim();
+  const jaFeta = estat.completats.map(String).includes(idActual);
+
+  if (jaFeta) {
+    // --- MODE: JA VALIDADA ---
+
+    // 2. Preparem dades de la solució
+    let solData = [];
+    try {
+      const rawSol = p.Solucio || p.solucio || "[]";
+      solData = typeof rawSol === "string" ? JSON.parse(rawSol) : rawSol;
+    } catch (e) {
+      console.error("Error parsejant solucio:", e);
+    }
+
+    const dadesPerTaula = prepararDadesSolucio(solData);
+
+    // 3. Pintem la vista fixa (Això omple el 'seccio-resolucio')
+    generarVisualitzacioCorrecta(
+      dadesPerTaula,
+      p.Referencia || p.referencia || `REF-${idActual}`,
+      p.Explicacio || p.explicacio || "Assentament correcte.",
+    );
+
+    // 4. Gestionem botons (S'han de buscar DESPRÉS de generar la vista si estan dins)
+    // Nota: Com que generarVisualitzacioCorrecta pot substituir el contingut,
+    // ens assegurem de trobar els botons de la nova estructura.
+    const btnValidar = document.getElementById("btn-validar");
+    const btnSeguent = document.getElementById("btn-seguent");
+    const btnSaltar = document.getElementById("btn-saltar");
+
+    if (btnValidar) btnValidar.classList.add("hidden");
+    if (btnSaltar) btnSaltar.classList.add("hidden");
+    if (btnSeguent) {
+      btnSeguent.classList.remove("hidden");
+      btnSeguent.innerText = "Següent Exercici ➡️";
+    }
+  } else {
+    // --- MODE: PER RESOLDRE (NOVA) ---
+
+    // 2. Restaurem tota l'estructura de la taula i botons
+    restaurarEstructuraTaulaInputs();
+
+    // 3. Ara que hem restaurat el HTML, els botons tornen a existir
+    const btnValidar = document.getElementById("btn-validar");
+    const btnSeguent = document.getElementById("btn-seguent");
+    const btnSaltar = document.getElementById("btn-saltar");
+
+    if (btnValidar) btnValidar.classList.remove("hidden");
+    if (btnSaltar) btnSaltar.classList.remove("hidden"); // Mostrem Saltar
+    if (btnSeguent) btnSeguent.classList.add("hidden"); // Amaguem Següent (verd)
+
+    // 4. Inicialitzem l'exercici buit
+    estat.assentament = [];
+    afegirFila();
+  }
+
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function restaurarEstructuraTaulaInputs() {
+  const contenidor = document.getElementById("seccio-resolucio");
+  if (!contenidor) return;
+
+  contenidor.innerHTML = `
+    <div class="overflow-x-auto">
+      <table id="taula-assentament" class="w-full text-left border-separate border-spacing-y-2">
+        <thead>
+          <tr class="text-[10px] uppercase tracking-widest text-slate-400">
+            <th class="px-4 py-2 font-black">Codi PGC</th>
+            <th class="px-4 py-2 font-black">Compte i Descripció</th>
+            <th class="px-4 py-2 font-black text-right">Deure</th>
+            <th class="px-4 py-2 font-black text-right">Haver</th>
+            <th class="px-4 py-2 text-center text-slate-300 italic font-medium tracking-tight">Acció</th>
+          </tr>
+        </thead>
+        <tbody id="diari-body">
+          </tbody>
+      </table>
+    </div>
+
+    <div id="pe-taula-inputs" class="mt-4 flex justify-between items-center px-4">
+      <button onclick="afegirFila()" class="group text-indigo-600 font-bold text-xs hover:text-indigo-800 transition-all uppercase tracking-widest flex items-center gap-2">
+        <span class="bg-indigo-100 group-hover:bg-indigo-600 group-hover:text-white w-6 h-6 flex items-center justify-center rounded-full transition-colors font-bold">+</span> 
+        Afegir línia
+      </button>
+      
+      <div class="flex gap-8 text-right bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div>
+          <p class="text-[9px] font-black text-slate-400 uppercase mb-1">Total Deure</p>
+          <div id="total-deure" class="text-3xl font-black text-emerald-700">0,00 €</div>
+        </div>
+        <div>
+          <p class="text-[9px] font-black text-slate-400 uppercase mb-1">Total Haver</p>
+          <div id="total-haver" class="text-3xl font-black text-sky-700">0,00 €</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function prepararDadesSolucio(solucioArray) {
+  if (!Array.isArray(solucioArray)) return [];
+
+  return solucioArray.map((linia) => {
+    // Busquem el nom del compte al nostre PGC carregat
+    const compteInfo = estat.pgc.find(
+      (c) => String(c.codi) === String(linia.codi || linia.c),
+    );
+    return {
+      codi: linia.codi || linia.c,
+      nom: compteInfo ? compteInfo.nom : "Compte desconegut",
+      deure: parseFloat(linia.deure || linia.d || 0),
+      haver: parseFloat(linia.haver || linia.h || 0),
+    };
+  });
+}
+//--- Mostra apunt correcta -----------------------------------------------------------------------------------------------
+
+function generarVisualitzacioCorrecta(
+  dadesApunt,
+  referencia = "S/REF",
+  explicacio = "",
+) {
+  const contenidor = document.getElementById("seccio-resolucio");
+  if (!contenidor) return;
+
+  // Calculem el total una vegada per no repetir codi
+  const total = dadesApunt.reduce((sum, l) => sum + (l.deure || 0), 0);
+
+  contenidor.innerHTML = `
+    <div class="bg-white rounded-xl shadow-sm border border-emerald-100 overflow-hidden mb-6 animate-fade-in">
+      <div class="bg-emerald-50 px-6 py-4 border-b border-emerald-100 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white shadow-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="flex flex-col">
+            <span class="font-black text-emerald-800 uppercase tracking-tighter text-xs leading-none">Assentament Validat</span>
+            <span class="text-[9px] text-emerald-600 font-bold uppercase mt-1 tracking-widest">${referencia}</span>
+          </div>
+        </div>
+        <span class="text-[10px] font-black text-emerald-600/40 uppercase tracking-widest">Llibre Diari</span>
+      </div>
+
+      <div class="p-0 overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50/50 text-[9px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
+              <th class="px-6 py-3 font-black">Codi</th>
+              <th class="px-6 py-3 font-black">Compte</th>
+              <th class="px-6 py-3 font-black text-right">Deure</th>
+              <th class="px-6 py-3 font-black text-right">Haver</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-50">
+            ${dadesApunt
+              .map(
+                (linia) => `
+              <tr class="hover:bg-slate-50/30 transition-colors">
+                <td class="px-6 py-4 font-mono text-xs font-bold text-indigo-600">${linia.codi}</td>
+                <td class="px-6 py-4 text-xs font-bold text-slate-700 uppercase">${linia.nom}</td>
+                <td class="px-6 py-4 text-xs text-right font-black ${linia.deure > 0 ? "text-slate-900" : "text-slate-200"}">
+                  ${linia.deure > 0 ? formatarMoneda(linia.deure) : "—"}
+                </td>
+                <td class="px-6 py-4 text-xs text-right font-black ${linia.haver > 0 ? "text-slate-900" : "text-slate-200"}">
+                  ${linia.haver > 0 ? formatarMoneda(linia.haver) : "—"}
+                </td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+          <tfoot>
+            <tr class="bg-emerald-50/20 border-t-2 border-emerald-100/50">
+               <td colspan="2" class="px-6 py-4 text-[10px] font-black text-emerald-800 uppercase text-right">Totals Quadrat</td>
+               <td class="px-6 py-4 text-sm font-black text-emerald-700 text-right">${formatarMoneda(total)}</td>
+               <td class="px-6 py-4 text-sm font-black text-emerald-700 text-right">${formatarMoneda(total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="bg-slate-50/50 p-6 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex-1">
+          <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 leading-none font-bold">Memòria d'operació</h4>
+          <p class="text-xs text-slate-600 leading-relaxed italic font-medium">
+            "${explicacio || "Assentament registrat correctament en el llibre diari segons el PGC."}"
+          </p>
+        </div>
+        
+        <button onclick="carregarSegüentPregunta()" class="w-full md:w-auto bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 active:scale-95 transition-all">
+          Següent Exercici ➡️
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-12 space-y-8 pt-8 border-t border-slate-100">
+      <div class="flex items-center gap-3 mb-4">
+          <div class="w-2 h-2 rounded-full bg-indigo-500"></div>
+          <h3 class="text-[10px] font-black text-slate-800 uppercase tracking-widest">Saldos de Major Actualitzats</h3>
+      </div>
+    </div>
+  `;
+
+  // Executem la funció dels majors perquè es pintin automàticament
+  if (typeof actualitzarMajors === "function") {
+    actualitzarMajors();
+  }
+}
+
+function validarExercici() {
+  const resultats = comprovarRespostes(); // La teva lògica actual de validació
+
+  if (resultats.percentatgeExit === 100) {
+    // Si tot és correcte, substituïm la zona d'inputs per la vista formal
+    generarVisualitzacioCorrecta(resultats.dadesAssentament);
+
+    // Opcional: Llançar una petita animació de confeti o feedback positiu
+    mostrarFeedbackExit();
+  } else {
+    // Mantenim la taula d'inputs i marquem els errors com fins ara
+    marcarErrorsInterficie(resultats.errors);
+  }
+}
+
+function restaurarEstructuraTaulaInputs() {
+  const contenidor = document.getElementById("seccio-resolucio");
+  if (!contenidor) return;
+
+  contenidor.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table id="taula-assentament" class="w-full text-left min-w-[700px] border-collapse">
+          <thead class="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest">
+            <tr>
+              <th class="p-4 w-32">Codi PGC</th>
+              <th class="p-4">Compte i Descripció</th>
+              <th class="p-4 text-right w-40">Deure</th>
+              <th class="p-4 text-right w-40">Haver</th>
+              <th class="p-4 w-20 text-center">Acció</th>
+            </tr>
+          </thead>
+          <tbody id="diari-body" class="divide-y divide-slate-100 font-mono text-sm italic"></tbody>
+          <tfoot class="bg-slate-50/80 font-black">
+            <tr class="border-t-2 border-slate-200">
+              <td colspan="2" class="p-4 text-right uppercase text-[10px] text-slate-400">Totals</td>
+              <td id="total-deure" class="p-4 text-right text-emerald-600 text-lg">0.00 €</td>
+              <td id="total-haver" class="p-4 text-right text-sky-600 text-lg">0.00 €</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="p-4 sm:p-6 bg-slate-100/50 border-t border-slate-200 flex flex-col sm:flex-row gap-4 justify-between items-center">
+        <button onclick="afegirFila()" class="w-full sm:w-auto text-indigo-600 font-black text-[10px] uppercase tracking-widest hover:text-indigo-800 transition-colors">
+          + Afegir línia d'apunt
+        </button>
+
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <button id="btn-validar" onclick="validarAssentament()" class="w-full sm:w-auto bg-indigo-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">
+            Validar
+          </button>
+
+          <button id="btn-saltar" onclick="carregarSegüentPregunta()" class="w-full sm:w-auto bg-slate-200 text-slate-600 px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-300 transition-all">
+            Saltar Exercici ⏭️
+          </button>
+          
+          <button id="btn-seguent" onclick="carregarSegüentPregunta()" class="hidden w-full sm:w-auto bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 active:scale-95 transition-all">
+            Següent Exercici ➡️
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-12 space-y-12 pt-8 border-t border-slate-100">
+      <div class="bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-3">
+            <div class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+            <h3 class="text-[10px] font-black text-slate-800 uppercase tracking-widest">Saldos de Major</h3>
+          </div>
+        </div>
+        <div id="majors-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <p class="text-[10px] text-slate-400 italic text-center col-span-full py-4">Fes l'assentament per veure els moviments.</p>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 //------------------------------------------------------------------Taula -------------------------------
@@ -766,8 +1034,8 @@ function actualitzarLecturaBona(el) {
   }
 }
 // VALIDAR -----------------------------------------------------VALIDAR
+
 async function validarAssentament() {
-  // 1. LECTURA DELS INPUTS DE LA TAULA
   const filesTaula = document.querySelectorAll("#diari-body tr");
   const dadesUsuari = [];
 
@@ -785,7 +1053,6 @@ async function validarAssentament() {
     }
   });
 
-  // 2. QUADRATURA BÀSICA
   const tD = dadesUsuari.reduce((a, l) => a + l.deure, 0);
   const tH = dadesUsuari.reduce((a, l) => a + l.haver, 0);
 
@@ -794,7 +1061,6 @@ async function validarAssentament() {
     return;
   }
 
-  // 3. FUNCIÓ DE NORMALITZACIÓ PER COMPARAR
   const normalitzar = (arr) => {
     if (!arr) return "[]";
     return JSON.stringify(
@@ -809,14 +1075,12 @@ async function validarAssentament() {
     );
   };
 
-  const solucioEsperada = estat.preguntaActual.solucio;
+  // IMPORTANT: Revisa si al teu objecte és 'solucio' o 'Solucio'
+  const solucioEsperada =
+    estat.preguntaActual.solucio || estat.preguntaActual.Solucio;
 
   const stringUsuari = normalitzar(dadesUsuari);
   const stringSolucio = normalitzar(solucioEsperada);
-
-  // DEBUG: Això t'ajudarà a veure l'error a la consola del navegador (F12)
-  console.log("USUARI:", stringUsuari);
-  console.log("SOLUCIÓ:", stringSolucio);
 
   if (stringUsuari === stringSolucio) {
     // --- TOT CORRECTE ---
@@ -825,20 +1089,20 @@ async function validarAssentament() {
       estat.preguntaActual.id || estat.preguntaActual.ID,
     ).trim();
 
-    // Guardar per a PDF
     if (!estat.historialPerExportar.some((h) => h.id === idActual)) {
       estat.historialPerExportar.push({
         id: idActual,
-        enunciat: estat.preguntaActual.enunciat,
+        enunciat:
+          estat.preguntaActual.enunciat || estat.preguntaActual.Enunciat,
         linies: JSON.parse(JSON.stringify(dadesUsuari)),
       });
     }
 
-    // Punts i registre
     if (!estat.completats.includes(idActual)) {
       estat.completats.push(idActual);
       try {
-        await fetch(API_URL, {
+        // Fem el post però no esperem la resposta per no bloquejar la UI
+        fetch(API_URL, {
           method: "POST",
           mode: "no-cors",
           body: JSON.stringify({
@@ -857,9 +1121,10 @@ async function validarAssentament() {
       }
     }
 
-    mostrarExit();
-    document.getElementById("btn-validar").classList.add("hidden");
-    document.getElementById("btn-seguent").classList.remove("hidden");
+    mostrarExit(); // El teu feedback de confeti/èxit
+
+    // CRUCIAL: Tornem a cridar mostrarPregunta per canviar la taula d'inputs per la "bonica"
+    mostrarPregunta();
   } else {
     alert(
       "❌ L'assentament encara té algun error en els comptes o els imports.",
@@ -1665,6 +1930,7 @@ function setIvaPerc(valor, el) {
 
   executarCalculIva(); // Recalculem automàticament
 }
+
 //--- Informes FINANCER -----------------------------------------------------------
 
 // Estats Financers Informes //
