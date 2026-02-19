@@ -1387,45 +1387,69 @@ function renderMajors() {
 }
 
 function carregarSegüentPregunta() {
-  // 1. NETEJA VISUAL
-  // Amaguem la medalla de l'èxit anterior
+  // 1. NETEJA VISUAL SEGURA
   const medalla = document.getElementById("medalla-container");
   if (medalla) medalla.classList.add("hidden");
 
-  // Eliminem els blocs temporals de "Exercici Completat" (si n'hi ha)
-  const missatgesAnteriors = document.querySelectorAll(".bg-emerald-50");
-  missatgesAnteriors.forEach((m) => m.remove());
+  // Eliminem missatges temporals d'èxit
+  document.querySelectorAll(".bg-emerald-50").forEach((m) => m.remove());
 
-  // Reset dels botons (tornem a mostrar Validar i amaguem Següent)
-  document.getElementById("btn-validar").classList.remove("hidden");
-  document.getElementById("btn-seguent").classList.add("hidden");
+  // 2. BUSCAR LA POSICIÓ ACTUAL (mantenint la lògica seqüencial)
+  if (!estat.preguntaActual) return;
+  const idActual = String(
+    estat.preguntaActual.ID_Activitat || estat.preguntaActual.id,
+  ).trim();
 
-  // 2. BUSCAR LA POSICIÓ ACTUAL
-  const idActual = estat.preguntaActual.ID_Activitat || estat.preguntaActual.id;
-
-  // Filtrem per tema (opcional: si vols que 'Següent' només vagi dins del mateix tema)
-  // Si prefereixes que vagi per ordre absolut de l'Excel, usa estat.preguntes directament
   const indexTotal = estat.preguntes.findIndex(
-    (p) => String(p.ID_Activitat || p.id) === String(idActual),
+    (p) => String(p.ID_Activitat || p.id).trim() === idActual,
   );
 
   // 3. DECIDIR EL SEGÜENT PAS
   if (indexTotal !== -1 && indexTotal < estat.preguntes.length - 1) {
     const següent = estat.preguntes[indexTotal + 1];
 
-    // Actualitzem l'estat del tema (per si la següent pregunta és d'un tema nou)
+    // Actualitzem l'estat
     estat.temaActiu = següent.Tema || següent.tema;
     estat.preguntaActual = següent;
 
-    // Mostrem la pregunta (neteja la taula i posa el nou enunciat)
+    // Primer generem el menú per marcar la nova activitat com a seleccionada
+    if (typeof generarMenuTemes === "function") generarMenuTemes();
+
+    // 4. MOSTRAR LA PREGUNTA
+    // Aquesta funció ja s'encarrega de restaurar la taula o posar la vista validada
     mostrarPregunta();
 
-    // Actualitzem el menú perquè la "rodona" de selecció es mogui
-    generarMenuTemes();
+    // 5. GESTIÓ SEGURA DE BOTONS (Sense que peticons si no existeixen)
+    // Fem servir l'interrogant ?. per evitar l'error de "classList of null"
+    const jaFeta = estat.completats
+      .map(String)
+      .includes(String(següent.ID_Activitat || següent.id).trim());
+
+    const btnVal = document.getElementById("btn-validar");
+    const btnSaltar = document.getElementById("btn-saltar");
+    const btnSeg = document.getElementById("btn-seguent");
+
+    if (jaFeta) {
+      btnVal?.classList.add("hidden");
+      btnSaltar?.classList.add("hidden");
+      btnSeg?.classList.remove("hidden");
+    } else {
+      btnVal?.classList.remove("hidden");
+      btnSaltar?.classList.remove("hidden");
+      btnSeg?.classList.add("hidden");
+    }
+
+    console.log(
+      "Navegant a l'activitat següent:",
+      següent.ID_Activitat || següent.id,
+    );
   } else {
     alert("🎉 Felicitats! Has completat tots els exercicis de l'Olimpíada.");
-    mostrarSeccio("dashboard");
+    if (typeof mostrarSeccio === "function") mostrarSeccio("dashboard");
   }
+
+  // Tornem a dalt de tot de la pàgina
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 // Variable per controlar el filtre (la pots posar fora de la funció)
