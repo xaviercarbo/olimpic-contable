@@ -14,7 +14,7 @@ let estat = {
 let ivaSeleccionat = 0.21;
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbzjp5UUW0xYQYaVC31nTe9eCwKVwpPiWkX5wPP8fMYpScmTLzBEB_TtmQU2BZxucBiD/exec"; // <--- ENGANXA LA URL AQUÍ
+  "https://script.google.com/macros/s/AKfycby8O_jIylWFg7TUHDUMCkT5VLoctt4X7R94qXB0Sti6Ddrs0vVPBBDVAholVuYepXG7/exec"; // <--- ENGANXA LA URL AQUÍ
 let modoActual = "login";
 
 // Aquest objecte contindrà tots els epígrafs dels teus PDFs
