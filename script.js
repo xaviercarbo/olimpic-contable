@@ -14,7 +14,7 @@ let estat = {
 let ivaSeleccionat = 0.21;
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycby0quB8-pxsfHLwLZfCuXwIMJjJeTrzjsYnUAlulj8axku8kDKe5NKYHqWCCZGl-fCG/exec"; // <--- ENGANXA LA URL AQUÍ
+  "https://script.google.com/macros/s/AKfycbzjp5UUW0xYQYaVC31nTe9eCwKVwpPiWkX5wPP8fMYpScmTLzBEB_TtmQU2BZxucBiD/exec"; // <--- ENGANXA LA URL AQUÍ
 let modoActual = "login";
 
 // Aquest objecte contindrà tots els epígrafs dels teus PDFs
@@ -1642,7 +1642,9 @@ async function mostrarRanquing(filtreGrup = "Tots") {
   const container = document.getElementById("contingut-ranquing");
   if (!container) return;
 
-  // Si ja tenim dades, no posem el spinner de càrrega per evitar parpelleigs
+  // 1. Definim el nom que volem que sigui INVISIBLE per a tothom
+  const NOM_A_EXCLOURE = "xavier";
+
   if (!dadesRanquingCache) {
     container.innerHTML = `
       <div class="flex flex-col items-center justify-center p-10 space-y-4">
@@ -1652,40 +1654,47 @@ async function mostrarRanquing(filtreGrup = "Tots") {
   }
 
   try {
-    // 2. Només fem el fetch si no tenim les dades a la memòria
     if (!dadesRanquingCache) {
       const res = await fetch(`${API_URL}?action=obtenirRanquing`);
       dadesRanquingCache = await res.json();
     }
 
-    // 3. Treballem amb una còpia per filtrar
-    let companys = [...dadesRanquingCache];
+    // 2. FILTRATGE ABSOLUT
+    let companys = dadesRanquingCache.filter((c) => {
+      // Convertim el nom de la fila a text de forma segura per evitar errors
+      const nomFila = String(c.nom || "")
+        .toLowerCase()
+        .trim();
 
-    if (filtreGrup !== "Tots") {
-      companys = companys.filter((c) => c.grup === filtreGrup);
-    }
+      // REGLA 1: Si és el nom exclòs, el traiem sempre (return false)
+      if (nomFila === NOM_A_EXCLOURE) {
+        return false;
+      }
 
-    // --- CONSTRUCCIÓ DE L'HTML (Mateixa lògica però més ràpida) ---
+      // REGLA 2: Si hi ha filtre de grup, el comprovem
+      if (filtreGrup !== "Tots") {
+        return c.grup === filtreGrup;
+      }
+
+      return true;
+    });
+
+    // --- CONSTRUCCIÓ DE L'HTML ---
     const estilsBotons =
       "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 shadow-sm border";
 
-    // He tret la crida recursiva directa dels botons per un sistema més net
     const botonsHtml = `
-  <div class="flex flex-col items-center mb-10">
-    <div class="flex justify-center gap-2 mb-4">
-      <button onclick="mostrarRanquing('Tots')" class="${estilsBotons} ${filtreGrup === "Tots" ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-100" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Tots</button>
-      <button onclick="mostrarRanquing('Grup A')" class="${estilsBotons} ${filtreGrup === "Grup A" ? "bg-amber-500 text-white border-amber-500 shadow-amber-100" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup A 🍎</button>
-      <button onclick="mostrarRanquing('Grup B')" class="${estilsBotons} ${filtreGrup === "Grup B" ? "bg-emerald-500 text-white border-emerald-500 shadow-emerald-100" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup B 🍏</button>
-    </div>
-    
-    <button onclick="refrescarDadesRanquing()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-300 border border-transparent hover:border-indigo-100">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-      </svg>
-      Sincronitzar dades
-    </button>
-  </div>
-`;
+      <div class="flex flex-col items-center mb-10">
+        <div class="flex justify-center gap-2 mb-4">
+          <button onclick="mostrarRanquing('Tots')" class="${estilsBotons} ${filtreGrup === "Tots" ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-100" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Tots</button>
+          <button onclick="mostrarRanquing('Grup A')" class="${estilsBotons} ${filtreGrup === "Grup A" ? "bg-amber-500 text-white border-amber-500 shadow-amber-100" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup A 🍎</button>
+          <button onclick="mostrarRanquing('Grup B')" class="${estilsBotons} ${filtreGrup === "Grup B" ? "bg-emerald-500 text-white border-emerald-500 shadow-emerald-100" : "bg-white text-slate-500 border-slate-100 hover:bg-slate-50"}">Grup B 🍏</button>
+        </div>
+        <button onclick="refrescarDadesRanquing()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-300 border border-transparent hover:border-indigo-100">
+          Sincronitzar dades
+        </button>
+      </div>
+    `;
 
     const llistaHtml =
       companys.length > 0
@@ -1719,14 +1728,14 @@ async function mostrarRanquing(filtreGrup = "Tots") {
             </div>`;
             })
             .join("")
-        : `<p class="text-center text-slate-400 py-10 italic">No hi ha dades.</p>`;
+        : `<p class="text-center text-slate-400 py-10 italic">No hi ha dades disponibles.</p>`;
 
     container.innerHTML =
       botonsHtml +
       `<div class="max-w-xl mx-auto animate-in fade-in duration-500">${llistaHtml}</div>`;
   } catch (e) {
     console.error("Error al rànquing:", e);
-    container.innerHTML = `<div class="p-6 bg-red-50 text-red-600 rounded-2xl text-center font-bold">Error de connexió</div>`;
+    container.innerHTML = `<div class="p-6 bg-red-50 text-red-600 rounded-2xl text-center font-bold">Error de connexió al rànquing</div>`;
   }
 }
 
