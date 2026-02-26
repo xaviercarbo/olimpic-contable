@@ -1082,6 +1082,10 @@ async function validarAssentament() {
   const stringUsuari = normalitzar(dadesUsuari);
   const stringSolucio = normalitzar(solucioEsperada);
 
+  // --- AFEGEIX AIXÒ AQUÍ PER DEPURAR ---
+  console.log("DEBUG - Usuari:", stringUsuari);
+  console.log("DEBUG - Solució:", stringSolucio);
+
   if (stringUsuari === stringSolucio) {
     // --- TOT CORRECTE ---
     estat.assentament = dadesUsuari;
