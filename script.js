@@ -1104,30 +1104,32 @@ async function validarAssentament() {
 
     if (!estat.completats.includes(idActual)) {
       estat.completats.push(idActual);
-      try {
-        // Fem el post però no esperem la resposta per no bloquejar la UI
-        fetch(API_URL, {
-          method: "POST",
-          mode: "no-cors",
-          body: JSON.stringify({
-            action: "registrarActivitat",
-            nom: estat.userActiu.nom,
-            idActivitat: idActual,
-            tema: estat.temaActiu,
-            punts: 10,
-          }),
-        });
-        estat.punts = (parseInt(estat.punts) || 0) + 10;
-        actualitzarDashboard();
-        generarMenuTemes();
-      } catch (e) {
-        console.error(e);
-      }
+
+      // Preparem les dades
+      const dadesEnviament = {
+        action: "registrarActivitat",
+        nom: estat.userActiu.nom,
+        idActivitat: idActual,
+        tema: estat.temaActiu,
+        punts: 10,
+      };
+
+      // Intentem l'enviament de forma més compatible
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(dadesEnviament),
+      })
+        .then((res) => console.log("Sincronització amb èxit"))
+        .catch((err) => console.error("Error en enviar dades:", err));
+
+      // Actualitzem la UI immediatament (sense esperar al servidor)
+      estat.punts = (parseInt(estat.punts) || 0) + 10;
+      actualitzarDashboard();
+      generarMenuTemes();
     }
 
-    mostrarExit(); // El teu feedback de confeti/èxit
-
-    // CRUCIAL: Tornem a cridar mostrarPregunta per canviar la taula d'inputs per la "bonica"
+    // Mostrem l'èxit i refresquem la pantalla
+    if (typeof mostrarExit === "function") mostrarExit();
     mostrarPregunta();
   } else {
     alert(
@@ -1646,7 +1648,6 @@ async function mostrarRanquing(filtreGrup = "Tots") {
   const container = document.getElementById("contingut-ranquing");
   if (!container) return;
 
-  // 1. Definim el nom que volem que sigui INVISIBLE per a tothom
   const NOM_A_EXCLOURE = "xavier";
 
   if (!dadesRanquingCache) {
@@ -1663,30 +1664,24 @@ async function mostrarRanquing(filtreGrup = "Tots") {
       dadesRanquingCache = await res.json();
     }
 
-    // 2. FILTRATGE ABSOLUT
     let companys = dadesRanquingCache.filter((c) => {
-      // Convertim el nom de la fila a text de forma segura per evitar errors
       const nomFila = String(c.nom || "")
         .toLowerCase()
         .trim();
-
-      // REGLA 1: Si és el nom exclòs, el traiem sempre (return false)
-      if (nomFila === NOM_A_EXCLOURE) {
-        return false;
-      }
-
-      // REGLA 2: Si hi ha filtre de grup, el comprovem
-      if (filtreGrup !== "Tots") {
-        return c.grup === filtreGrup;
-      }
-
+      if (nomFila === NOM_A_EXCLOURE) return false;
+      if (filtreGrup !== "Tots") return c.grup === filtreGrup;
       return true;
     });
 
-    // --- CONSTRUCCIÓ DE L'HTML ---
+    const puntsUnics = [
+      ...new Set(companys.map((c) => parseInt(c.punts || 0))),
+    ].sort((a, b) => b - a);
+    const puntsOr = puntsUnics[0] || -1;
+    const puntsPlata = puntsUnics[1] || -1;
+    const puntsBronze = puntsUnics[2] || -1;
+
     const estilsBotons =
       "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 shadow-sm border";
-
     const botonsHtml = `
       <div class="flex flex-col items-center mb-10">
         <div class="flex justify-center gap-2 mb-4">
@@ -1697,52 +1692,76 @@ async function mostrarRanquing(filtreGrup = "Tots") {
         <button onclick="refrescarDadesRanquing()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-300 border border-transparent hover:border-indigo-100">
           Sincronitzar dades
         </button>
-      </div>
-    `;
+      </div>`;
 
     const llistaHtml =
       companys.length > 0
         ? companys
             .map((c, i) => {
-              let medal =
-                i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1;
-              let bgClass =
-                i === 0
-                  ? "bg-amber-50 border-amber-200"
-                  : i === 1
-                    ? "bg-slate-50 border-slate-200"
-                    : i === 2
-                      ? "bg-orange-50 border-orange-200"
-                      : "bg-white border-slate-100";
+              const p = parseInt(c.punts || 0);
+              let medal = i + 1;
+              let bgClass = "bg-white border-slate-100";
+              let medalClass = "bg-slate-100 text-slate-400 w-10 h-10 text-xs";
+              let nomColor = "text-slate-800"; // Color de lletra per defecte
+
+              if (p > 0) {
+                if (p === puntsOr) {
+                  medal = "🥇";
+                  bgClass = "bg-amber-100 border-amber-400 shadow-inner";
+                  medalClass = "bg-white shadow-md w-14 h-14 text-2xl";
+                  nomColor = "text-amber-900"; // Nom més fosc per contrastar amb l'or
+                } else if (p === puntsPlata) {
+                  medal = "🥈";
+                  bgClass = "bg-slate-200 border-slate-400";
+                  medalClass = "bg-white shadow-md w-12 h-12 text-xl";
+                  nomColor = "text-slate-900";
+                } else if (p === puntsBronze) {
+                  medal = "🥉";
+                  bgClass = "bg-orange-100 border-orange-300";
+                  medalClass = "bg-white shadow-md w-12 h-12 text-xl";
+                  nomColor = "text-orange-900";
+                }
+              }
 
               return `
-            <div class="flex items-center justify-between p-4 rounded-2xl border mb-3 transition-all hover:shadow-md ${bgClass}">
-              <div class="flex items-center gap-4">
-                <div class="w-10 h-10 flex items-center justify-center rounded-full font-black text-xs ${i < 3 ? "bg-white shadow-sm" : "bg-slate-100 text-slate-400"}">
+            <div class="flex items-center justify-between p-5 rounded-3xl border-2 mb-4 transition-all hover:scale-[1.02] hover:shadow-lg ${bgClass}">
+              <div class="flex items-center gap-5">
+                <div class="flex items-center justify-center rounded-full font-black ${medalClass}">
                   ${medal}
                 </div>
                 <div>
-                  <p class="font-black text-slate-700 uppercase text-xs tracking-tight">${c.nom}</p>
-                  <p class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">${c.grup}</p>
+                  <p class="font-black ${nomColor} uppercase text-sm tracking-tight">${c.nom}</p>
+                  <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">${c.grup}</p>
                 </div>
               </div>
               <div class="text-right">
-                <span class="text-xs font-black text-indigo-600 px-3 py-1 bg-white rounded-lg border shadow-sm">${c.punts} PTS</span>
+                <span class="text-sm font-black text-indigo-700 px-4 py-2 bg-white rounded-xl border-2 shadow-sm">
+                  ${p} <span class="text-[10px] ml-0.5">PTS</span>
+                </span>
               </div>
             </div>`;
             })
             .join("")
         : `<p class="text-center text-slate-400 py-10 italic">No hi ha dades disponibles.</p>`;
 
+    // --- RENDERITZAT FINAL AMB TÍTOL ---
     container.innerHTML =
       botonsHtml +
-      `<div class="max-w-xl mx-auto animate-in fade-in duration-500">${llistaHtml}</div>`;
+      `
+      <div class="max-w-xl mx-auto">
+        <div class="text-center mb-8">
+          <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tighter">Hall of Fame</h2>
+          <p class="text-[10px] font-bold text-indigo-500 uppercase tracking-[0.3em]">Olimpíada Comptable 2026</p>
+        </div>
+        <div class="animate-in fade-in slide-in-from-bottom-4 duration-700">
+          ${llistaHtml}
+        </div>
+      </div>`;
   } catch (e) {
     console.error("Error al rànquing:", e);
     container.innerHTML = `<div class="p-6 bg-red-50 text-red-600 rounded-2xl text-center font-bold">Error de connexió al rànquing</div>`;
   }
 }
-
 // 4. OPCIONAL: Funció per forçar actualització si volem dades fresques
 // Funció per forçar la recàrrega de dades reals de Google Sheets
 async function refrescarDadesRanquing() {
