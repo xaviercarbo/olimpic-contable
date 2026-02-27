@@ -1702,14 +1702,14 @@ async function mostrarRanquing(filtreGrup = "Tots") {
               let medal = i + 1;
               let bgClass = "bg-white border-slate-100";
               let medalClass = "bg-slate-100 text-slate-400 w-10 h-10 text-xs";
-              let nomColor = "text-slate-800"; // Color de lletra per defecte
+              let nomColor = "text-slate-800";
 
               if (p > 0) {
                 if (p === puntsOr) {
                   medal = "🥇";
                   bgClass = "bg-amber-100 border-amber-400 shadow-inner";
                   medalClass = "bg-white shadow-md w-14 h-14 text-2xl";
-                  nomColor = "text-amber-900"; // Nom més fosc per contrastar amb l'or
+                  nomColor = "text-amber-900";
                 } else if (p === puntsPlata) {
                   medal = "🥈";
                   bgClass = "bg-slate-200 border-slate-400";
@@ -1744,14 +1744,20 @@ async function mostrarRanquing(filtreGrup = "Tots") {
             .join("")
         : `<p class="text-center text-slate-400 py-10 italic">No hi ha dades disponibles.</p>`;
 
-    // --- RENDERITZAT FINAL AMB TÍTOL ---
+    // --- RENDERITZAT FINAL AMB LLORER DAURAT ---
     container.innerHTML =
       botonsHtml +
       `
       <div class="max-w-xl mx-auto">
-        <div class="text-center mb-8">
-          <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tighter">Hall of Fame</h2>
-          <p class="text-[10px] font-bold text-indigo-500 uppercase tracking-[0.3em]">Olimpíada Comptable 2026</p>
+        <div class="text-center mb-10">
+          <div class="flex items-center justify-center gap-4 mb-2">
+            <img src="./img/llaurer_daurat.png" class="h-12 w-auto object-contain" alt="Llorer">
+            
+            <h2 class="text-3xl font-black text-slate-800 uppercase tracking-tighter">Hall of Fame</h2>
+            
+            <img src="./img/llaurer_daurat.png" class="h-12 w-auto object-contain scale-x-[-1]" alt="Llorer">
+          </div>
+          <p class="text-[10px] font-bold text-indigo-500 uppercase tracking-[0.4em] ml-1">Olimpíada Comptable 2026</p>
         </div>
         <div class="animate-in fade-in slide-in-from-bottom-4 duration-700">
           ${llistaHtml}
