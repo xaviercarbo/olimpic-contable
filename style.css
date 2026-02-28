@@ -165,3 +165,29 @@ input[type="number"]::-webkit-outer-spin-button {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 1. Eliminem la fletxa per defecte de Safari en llistes i detalls */
+li::marker,
+summary::marker,
+summary::-webkit-details-marker {
+  display: none !important;
+  content: "";
+}
+
+/* 2. Reset d'alineació per al menú lateral */
+/* Ajusta el selector (.nom-de-la-teva-llista) al que facis servir */
+aside ul,
+.sidebar ul {
+  list-style: none !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+/* 3. Forçar l'alineació dels ítems */
+aside li,
+.sidebar li {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  padding-left: 1rem; /* Ajusta aquest valor segons vulguis de separat del borde */
+}
