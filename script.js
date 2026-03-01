@@ -965,16 +965,23 @@ function renderTaula() {
 
       return `
         <tr class="hover:bg-slate-50 transition border-b border-slate-100" data-index="${idx}">
-            <td class="p-2 w-32">
-                <input type="text" list="pgc-list" value="${linia.codi}" 
-                    onchange="updateLinia(${idx}, 'codi', this.value)"
-                    class="select-compte w-full p-2 outline-none font-bold text-xl text-indigo-600 bg-transparent focus:ring-2 focus:ring-indigo-200 rounded">
+            <td class="p-2 w-40"> <div class="flex items-center bg-indigo-50 rounded px-2 border border-indigo-100">
+                    <input type="text" list="pgc-list" value="${linia.codi}" 
+                        placeholder="Codi"
+                        onchange="updateLinia(${idx}, 'codi', this.value)"
+                        class="select-compte w-full p-2 outline-none font-black text-xl text-indigo-700 bg-transparent focus:ring-0">
+                    <span class="text-indigo-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </span>
+                </div>
             </td>
-            <td class="p-2 text-slate-500 text-sm font-medium nom-compte">${linia.nom}</td>
+            <td class="p-2 text-slate-500 text-sm font-bold nom-compte uppercase tracking-tight">${linia.nom}</td>
             
             <td class="p-2">
                 <div class="flex flex-col">
-                    <div class="flex items-center bg-emerald-50 rounded px-2">
+                    <div class="flex items-center bg-emerald-50 rounded px-2 border border-emerald-100">
                         <input type="number" step="0.01" value="${linia.deure || ""}" placeholder="0,00"
                             oninput="actualitzarLecturaBona(this)"
                             onchange="updateLinia(${idx}, 'deure', this.value)" 
@@ -989,7 +996,7 @@ function renderTaula() {
 
             <td class="p-2">
                 <div class="flex flex-col">
-                    <div class="flex items-center bg-sky-50 rounded px-2">
+                    <div class="flex items-center bg-sky-50 rounded px-2 border border-sky-100">
                         <input type="number" step="0.01" value="${linia.haver || ""}" placeholder="0,00"
                             oninput="actualitzarLecturaBona(this)"
                             onchange="updateLinia(${idx}, 'haver', this.value)" 
@@ -1012,11 +1019,14 @@ function renderTaula() {
   const elTotalDeure = document.getElementById("total-deure");
   const elTotalHaver = document.getElementById("total-haver");
 
-  elTotalDeure.innerText = formatarMoneda(totalDeure);
-  elTotalHaver.innerText = formatarMoneda(totalHaver);
-
-  elTotalDeure.className = "text-3xl font-black text-emerald-700";
-  elTotalHaver.className = "text-3xl font-black text-sky-700";
+  if (elTotalDeure) {
+    elTotalDeure.innerText = formatarMoneda(totalDeure);
+    elTotalDeure.className = "text-3xl font-black text-emerald-700";
+  }
+  if (elTotalHaver) {
+    elTotalHaver.innerText = formatarMoneda(totalHaver);
+    elTotalHaver.className = "text-3xl font-black text-sky-700";
+  }
 
   renderMajors();
 }
