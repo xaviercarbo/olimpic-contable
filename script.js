@@ -437,8 +437,6 @@ function generarMenuTemes() {
   const menu = document.getElementById("menu-temes");
   if (!menu) return;
 
-  // 1. Corregim l'accés a la columna B (Tema)
-  // Fem servir 'p.Tema' o 'p.tema' per si de cas
   const temes = [
     ...new Set(estat.preguntes.map((p) => p.Tema || p.tema)),
   ].filter(Boolean);
@@ -449,23 +447,38 @@ function generarMenuTemes() {
         (p) => (p.Tema || p.tema) === nomTema,
       );
 
-      // DETERMINEM SI EL TEMA HA D'ESTAR OBERT
+      // --- LÒGICA DE COLORS PER AL TEMA ---
+      const totalActivitats = preguntesDelTema.length;
+      const numCompletades = preguntesDelTema.filter((p) => {
+        const id = p.ID_Activitat || p.id;
+        return estat.completats.map(String).includes(String(id));
+      }).length;
+
+      let colorClasseTema = "text-indigo-400"; // Blau (Pendent per defecte)
+
+      if (numCompletades === totalActivitats && totalActivitats > 0) {
+        colorClasseTema = "text-emerald-500"; // Verd (Tot acabat)
+      } else if (numCompletades > 0) {
+        colorClasseTema = "text-amber-500"; // Taronja (En procés)
+      }
+      // ------------------------------------
+
       const esTemaActiu = estat.temaActiu === nomTema;
 
       return `
       <li class="mb-2">
         <details class="group" ${esTemaActiu ? "open" : ""}>
-          <summary class="flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer hover:bg-slate-800/50 transition text-indigo-400 font-black text-[9px] uppercase tracking-widest list-none">
+          <summary class="flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer hover:bg-slate-800/50 transition ${colorClasseTema} font-black text-[9px] uppercase tracking-widest list-none">
             <span class="flex items-center gap-2">
               <span class="group-open:rotate-90 transition-transform text-[8px]">▶</span>
               ${nomTema}
+              <span class="ml-1 opacity-70">(${numCompletades}/${totalActivitats})</span>
             </span>
           </summary>
           
           <ul class="mt-1 space-y-0.5 border-l border-slate-800 ml-4">
             ${preguntesDelTema
               .map((p, index) => {
-                // Referència a la columna A (ID_Activitat) i columna H (Descripcio)
                 const idPregunta = p.ID_Activitat || p.id;
                 const descripcioPregunta =
                   p.Descripcio ||
@@ -476,6 +489,7 @@ function generarMenuTemes() {
                 const feta = estat.completats
                   .map(String)
                   .includes(String(idPregunta));
+
                 const esActiva =
                   estat.preguntaActual &&
                   String(
@@ -545,7 +559,6 @@ function seleccionarPreguntaDirecta(id) {
 // Funció generar llista suggerida ------------------------------------------------------------------------------------
 
 function generarDatalistPGC() {
-  // Creem un element <datalist> dinàmicament
   let dl = document.getElementById("pgc-list");
   if (!dl) {
     dl = document.createElement("datalist");
@@ -553,8 +566,9 @@ function generarDatalistPGC() {
     document.body.appendChild(dl);
   }
 
+  // Concatenem CODI + NOM dins del value perquè Safari ho mostri tot
   dl.innerHTML = estat.pgc
-    .map((c) => `<option value="${c.codi}">${c.nom}</option>`)
+    .map((c) => `<option value="${c.codi} - ${c.nom}"></option>`)
     .join("");
 }
 
@@ -909,7 +923,14 @@ function eliminarLinia(index) {
 function updateLinia(index, camp, valor) {
   if (!estat.assentament[index]) return;
 
-  // 1. Actualitzem la dada a la memòria
+  // --- NOU: NETEJA PER A COMPATIBILITAT AMB SAFARI/IPHONE ---
+  // Si l'usuari selecciona del datalist, el valor pot ser "600 - Compres..."
+  // Ens quedem només amb la part del codi (abans del guionet)
+  if (camp === "codi" && valor.includes(" - ")) {
+    valor = valor.split(" - ")[0].trim();
+  }
+
+  // 1. Actualitzem la dada a la memòria amb el valor ja netejat
   estat.assentament[index][camp] = valor;
 
   // 2. Busquem la fila a la pantalla per fer canvis visuals directes
@@ -918,15 +939,22 @@ function updateLinia(index, camp, valor) {
 
   // 3. Si canvia el CODI, busquem el nom i l'actualitzem a la pantalla
   if (camp === "codi") {
+    // Busquem al PGC usant el codi netejat
     const compteTrobat = estat.pgc.find(
       (c) => String(c.codi) === String(valor),
     );
+
     const nomNet = compteTrobat ? compteTrobat.nom : "Compte no trobat";
     estat.assentament[index].nom = nomNet;
 
-    // Busquem l'element on es mostra el nom (assegura't que tingui la classe 'nom-compte')
+    // Actualitzem el text de la descripció a la cel·la corresponent
     const cel·laNom = fila.querySelector(".nom-compte");
     if (cel·laNom) cel·laNom.innerText = nomNet;
+
+    // OPCIONAL: Netejar l'input del codi perquè només quedi el número (ex: "600")
+    // Això evita que l'input es vegi massa ple després de seleccionar
+    const inputCodi = fila.querySelector(".select-compte");
+    if (inputCodi) inputCodi.value = valor;
   }
 
   // 4. LÒGICA D'EXCLUSIVITAT (Neteja visual d'imports)

@@ -191,3 +191,39 @@ aside li,
   text-align: left;
   padding-left: 1rem; /* Ajusta aquest valor segons vulguis de separat del borde */
 }
+
+/* Forcem que el contenidor principal ocupi tota la pantalla i no creixi */
+aside {
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+/* Personalització de la barra de scroll per fer-la discreta */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #1e293b; /* Color slate-800 */
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #334155; /* Color slate-700 */
+}
+
+.custom-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #334155; /* slate-700 */
+  border-radius: 10px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
