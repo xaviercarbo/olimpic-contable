@@ -402,8 +402,6 @@ async function carregarDadesContables() {
   }
 }
 
-//--------------------------------
-
 // Navegació entre Dashboard, Exercici, Progrés i Rànquing
 function mostrarSeccio(id) {
   // 1. Llista de seccions actualitzada amb 'seccio-informes'
@@ -447,35 +445,59 @@ function mostrarSeccio(id) {
   }
 }
 
+//Filtrar temas pendent / generar temas
 function generarMenuTemes() {
   const menu = document.getElementById("menu-temes");
   if (!menu) return;
 
-  const temes = [
+  // 1. Verificació de dades inicial (Si això falla, el problema és la càrrega de dades)
+  if (!estat.preguntes || estat.preguntes.length === 0) {
+    console.error("ERROR: estat.preguntes està buit!");
+    return;
+  }
+
+  // 2. Agafem el checkbox. Si no el troba, nomesPendents serà FALSE per defecte.
+  const filtreCheck = document.getElementById("filtre-pendents");
+  const nomesPendents = filtreCheck && filtreCheck.checked === true;
+
+  // 3. Obtenim la llista de temes
+  let llistaTemes = [
     ...new Set(estat.preguntes.map((p) => p.Tema || p.tema)),
   ].filter(Boolean);
 
-  menu.innerHTML = temes
+  // 4. APLIQUEM EL FILTRE NOMÉS SI EL CHECK ESTÀ REALMENT MARCAT
+  if (nomesPendents) {
+    llistaTemes = llistaTemes.filter((nomTema) => {
+      const preguntesDelTema = estat.preguntes.filter(
+        (p) => (p.Tema || p.tema) === nomTema,
+      );
+      const total = preguntesDelTema.length;
+      const fets = preguntesDelTema.filter((p) => {
+        const id = String(p.ID_Activitat || p.id);
+        return estat.completats.map(String).includes(id);
+      }).length;
+
+      return fets < total; // Si fets == total, el tema s'exclou
+    });
+  }
+
+  // 5. GENERACIÓ DEL HTML
+  const htmlResultat = llistaTemes
     .map((nomTema) => {
       const preguntesDelTema = estat.preguntes.filter(
         (p) => (p.Tema || p.tema) === nomTema,
       );
-
-      // --- LÒGICA DE COLORS PER AL TEMA ---
       const totalActivitats = preguntesDelTema.length;
       const numCompletades = preguntesDelTema.filter((p) => {
-        const id = p.ID_Activitat || p.id;
-        return estat.completats.map(String).includes(String(id));
+        const id = String(p.ID_Activitat || p.id);
+        return estat.completats.map(String).includes(id);
       }).length;
 
-      let colorClasseTema = "text-indigo-400"; // Blau (Pendent per defecte)
-
-      if (numCompletades === totalActivitats && totalActivitats > 0) {
-        colorClasseTema = "text-emerald-500"; // Verd (Tot acabat)
-      } else if (numCompletades > 0) {
-        colorClasseTema = "text-amber-500"; // Taronja (En procés)
-      }
-      // ------------------------------------
+      const estaAcabat = numCompletades === totalActivitats;
+      let colorClasseTema = "text-indigo-400"; // Blau
+      if (estaAcabat)
+        colorClasseTema = "text-emerald-500"; // Verd
+      else if (numCompletades > 0) colorClasseTema = "text-amber-500"; // Taronja
 
       const esTemaActiu = estat.temaActiu === nomTema;
 
@@ -489,48 +511,26 @@ function generarMenuTemes() {
               <span class="ml-1 opacity-70">(${numCompletades}/${totalActivitats})</span>
             </span>
           </summary>
-          
           <ul class="mt-1 space-y-0.5 border-l border-slate-800 ml-4">
             ${preguntesDelTema
               .map((p, index) => {
-                const idPregunta = p.ID_Activitat || p.id;
-                const descripcioPregunta =
-                  p.Descripcio ||
-                  p.descripcio ||
-                  p.titol ||
-                  `Activitat ${index + 1}`;
-
-                const feta = estat.completats
-                  .map(String)
-                  .includes(String(idPregunta));
-
+                const idPregunta = String(p.ID_Activitat || p.id);
+                const feta = estat.completats.map(String).includes(idPregunta);
                 const esActiva =
                   estat.preguntaActual &&
                   String(
                     estat.preguntaActual.ID_Activitat ||
                       estat.preguntaActual.id,
-                  ) === String(idPregunta);
-
+                  ) === idPregunta;
                 return `
-                <li class="relative">
+                <li>
                   <button onclick="seleccionarPreguntaDirecta('${idPregunta}')" 
-                    class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group
-                    ${esActiva ? "bg-indigo-500/20 border border-indigo-500/30" : "border border-transparent hover:bg-slate-800/40"}">
-                    
-                    <div class="w-5 h-5 shrink-0 flex items-center justify-center rounded-md text-[9px] font-bold border
-                      ${
-                        esActiva
-                          ? "bg-indigo-600 border-indigo-500 text-white"
-                          : feta
-                            ? "bg-emerald-500 border-emerald-500 text-white"
-                            : "bg-slate-800 border-slate-700 text-slate-500"
-                      }">
+                    class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${esActiva ? "bg-indigo-500/20 border border-indigo-500/30" : "border border-transparent hover:bg-slate-800/40"}">
+                    <div class="w-5 h-5 shrink-0 flex items-center justify-center rounded-md text-[9px] font-bold border ${esActiva ? "bg-indigo-600 text-white" : feta ? "bg-emerald-500 text-white" : "bg-slate-800 text-slate-500"}">
                       ${feta ? "✓" : index + 1}
                     </div>
-
-                    <span class="text-[11px] font-bold truncate 
-                      ${esActiva ? "text-indigo-200" : feta ? "text-slate-500" : "text-slate-300 group-hover:text-white"}">
-                      ${descripcioPregunta}
+                    <span class="text-[11px] font-bold truncate ${esActiva ? "text-indigo-200" : feta ? "text-slate-500" : "text-slate-300 group-hover:text-white"}">
+                      ${p.Descripcio || p.descripcio || `Activitat ${index + 1}`}
                     </span>
                   </button>
                 </li>`;
@@ -541,8 +541,9 @@ function generarMenuTemes() {
       </li>`;
     })
     .join("");
-}
 
+  menu.innerHTML = htmlResultat;
+}
 // AQUESTA FUNCIÓ ÉS LA QUE FA QUE EL MENÚ FUNCIONI EN CLICAR
 function seleccionarPreguntaDirecta(id) {
   // 1. Busquem la pregunta assegurant que comparem text amb text
