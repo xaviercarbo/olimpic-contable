@@ -227,3 +227,17 @@ aside {
 .custom-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+
+#menu-temes::-webkit-scrollbar {
+  width: 4px;
+}
+#menu-temes::-webkit-scrollbar-track {
+  background: transparent;
+}
+#menu-temes::-webkit-scrollbar-thumb {
+  background: #334155; /* slate-700 */
+  border-radius: 10px;
+}
+#menu-temes::-webkit-scrollbar-thumb:hover {
+  background: #475569; /* slate-600 */
+}
