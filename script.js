@@ -22,27 +22,31 @@ let modoActual = "login";
 const ESTRUCTURA_PGC_FINAL = {
   actiu: [
     {
-      titol: "A) ACTIU NO CORRIENT",
+      titol: "A) ACTIU NO CORRENT",
       sub: [
-        { titol: "I. Immobilitzat intangible", regex: /^(20)/ },
-        { titol: "II. Immobilitzat material", regex: /^(21|23)/ },
-        { titol: "III. Inversions immobiliàries", regex: /^(22)/ },
+        { titol: "I. Immobilitzat intangible", regex: /^(20|280|290)/ },
+        { titol: "II. Immobilitzat material", regex: /^(21|23|281|291)/ },
+        { titol: "III. Inversions immobiliàries", regex: /^(22|282|292)/ },
         {
-          titol: "V. Inversions financeres a llarg termini",
+          titol: "VI. Inversions financeres a llarg termini",
           regex: /^(24|25)/,
         },
       ],
     },
     {
-      titol: "B) ACTIU CORRIENT",
+      titol: "B) ACTIU CORRENT",
       sub: [
-        { titol: "II. Existències", regex: /^(3)/ },
+        { titol: "I. Existències", regex: /^(3|407)/ },
         {
-          titol: "III. Deutors comercials i altres comptes a cobrar",
-          regex: /^(43|44|470|471|472)/,
+          titol: "II. Deutors comercials i altres comptes a cobrar",
+          regex: /^(43|44|470|471|472|473)/,
         },
         {
-          titol: "VII. Efectiu i altres actius líquids equivalents",
+          titol: "IV. Inversions financeres a curt termini",
+          regex: /^(53|54|551|5525|554|59)/,
+        },
+        {
+          titol: "VI. Efectiu i altres actius líquids equivalents",
           regex: /^(57)/,
         },
       ],
@@ -52,12 +56,22 @@ const ESTRUCTURA_PGC_FINAL = {
     {
       titol: "A) PATRIMONI NET",
       sub: [
-        { titol: "I. Capital", regex: /^(10)/ },
+        { titol: "I. Capital Social", regex: /^(10)/ },
         { titol: "VII. Resultat de l'exercici", esResultat: true }, // Aquí s'integra P&G
       ],
     },
     {
-      titol: "C) PASSIU CORRIENT",
+      titol: "B) PASSIU NO CORRENT",
+      sub: [
+        { titol: "I. Provisions a llarg termini", regex: /^(14)/ },
+        {
+          titol: "III. Deutes a llarg termini",
+          regex: /^(17|15)/,
+        },
+      ],
+    },
+    {
+      titol: "C) PASSIU CORRENT",
       sub: [
         { titol: "III. Deutes a curt termini", regex: /^(51|52)/ },
         {
