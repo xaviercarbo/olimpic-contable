@@ -241,3 +241,46 @@ aside {
 #menu-temes::-webkit-scrollbar-thumb:hover {
   background: #475569; /* slate-600 */
 }
+#sidebar-main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Altura total de la finestra */
+  overflow: hidden; /* Evita que el sidebar s'estiri infinitament */
+}
+
+#menu-temes {
+  flex: 1 1 auto; /* Aquest element és l'únic que pot créixer i tenir scroll */
+  overflow-y: auto;
+  min-height: 0; /* Vital per a Safari en Flexbox */
+}
+
+/* --- Barra de scroll minimalista i suau --- */
+
+/* 1. Definim l'amplada de la barra (molt fina) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px; /* Molt estreta */
+  height: 4px;
+}
+
+/* 2. El fons de la barra (el camí) el fem transparent */
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 3. La peça que es mou (el "thumb") */
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2); /* Un gris molt suau i transparent */
+  border-radius: 20px;
+  transition: background 0.3s ease;
+}
+
+/* 4. Quan l'usuari hi passa el ratolí per sobre, es foscueix una mica */
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.5); /* Color indigo suau al fer hover */
+}
+
+/* Per a Firefox (que no usa webkit) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+}
