@@ -52,15 +52,6 @@ input:focus {
   transform: rotate(180deg);
 }
 
-/* Sidebar scroll */
-.custom-scroll::-webkit-scrollbar {
-  width: 4px;
-}
-.custom-scroll::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 10px;
-}
-
 /* Estil per als Majors (substituint els @apply per CSS normal) */
 .t-major {
   background-color: white;
@@ -200,30 +191,7 @@ aside {
 }
 
 /* Personalització de la barra de scroll per fer-la discreta */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #1e293b; /* Color slate-800 */
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #334155; /* Color slate-700 */
-}
-
-.custom-scroll::-webkit-scrollbar {
-  width: 4px;
-}
-.custom-scroll::-webkit-scrollbar-thumb {
-  background: #334155; /* slate-700 */
-  border-radius: 10px;
-}
 .custom-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -270,8 +238,8 @@ aside {
 /* 3. La peça que es mou (el "thumb") */
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.2); /* Un gris molt suau i transparent */
-  border-radius: 20px;
-  transition: background 0.3s ease;
+  border-radius: 10px;
+  transition: all 0.3s ease;
 }
 
 /* 4. Quan l'usuari hi passa el ratolí per sobre, es foscueix una mica */
