@@ -209,17 +209,24 @@ aside {
 #menu-temes::-webkit-scrollbar-thumb:hover {
   background: #475569; /* slate-600 */
 }
+
+/* --- Ajust en la opció de Sortir --- */
+
 #sidebar-main {
-  display: flex;
-  flex-direction: column;
-  height: 100vh; /* Altura total de la finestra */
-  overflow: hidden; /* Evita que el sidebar s'estiri infinitament */
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh !important; /* Força que ocupi el 100% de la pantalla vertical */
+  overflow: hidden !important; /* Impedeix que el sidebar creixi més de la compte */
 }
 
 #menu-temes {
-  flex: 1 1 auto; /* Aquest element és l'únic que pot créixer i tenir scroll */
-  overflow-y: auto;
-  min-height: 0; /* Vital per a Safari en Flexbox */
+  flex: 1 1 auto !important; /* Aquest element és l'únic que pot "encongir-se" */
+  min-height: 0 !important; /* CLAU: Permet que el llistat tingui scroll propi i no empenyi el de sota */
+  overflow-y: auto !important;
+}
+
+#user-perfil {
+  margin-top: auto; /* L'empeny sempre al final de tot */
 }
 
 /* --- Barra de scroll minimalista i suau --- */
